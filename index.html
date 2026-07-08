@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cosmos Smear — dissolving type</title>
+<title>Cosmos Type FX — smear &amp; liquid</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400..800&family=Fredoka:wght@300..700&family=Nunito:wght@200..1000&family=Quicksand:wght@300..700&family=Varela+Round&family=Inter:wght@100..900&display=swap" rel="stylesheet">
@@ -113,13 +113,40 @@
   button.primary { background: #ff2d55; border-color: #ff2d55; color: #fff; }
   button.primary:hover { background: #ff4468; }
   #fallbackNote { color:#ff8; font-size:11px; display:none; margin-top:8px; }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .tabs .tab {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    background: #101016;
+    border: 1px solid #2c2c36;
+    border-radius: 8px;
+    color: #8a8a9e;
+    cursor: pointer;
+  }
+  .tabs .tab:hover { background: #1a1a22; color: #c8c8d8; }
+  .tabs .tab.active {
+    background: #2a1a28;
+    border-color: #ff4fa3;
+    color: #ffb8d8;
+  }
 </style>
 </head>
 <body>
 <div id="stage"><canvas id="gl" width="896" height="1120"></canvas></div>
 
 <aside id="panel">
-  <h1>Cosmos Smear</h1>
+  <h1>Cosmos Type FX</h1>
+  <div class="tabs">
+    <button type="button" class="tab active" data-engine="smear">Smear</button>
+    <button type="button" class="tab" data-engine="liquid">Liquid</button>
+  </div>
 
   <div class="group">
     <div class="gtitle">Type</div>
@@ -190,6 +217,7 @@
     <label class="row sweepOpt sweepRollingOpt" style="display:none"><span class="lbl">Heal lead</span>
       <input type="range" id="sweepLead" min="0.1" max="10" step="0.1" value="4.4">
       <output id="sweepLeadOut">4.4s</output></label>
+    <div id="smearControls">
     <label class="check"><input type="checkbox" id="slideChk"> Slide letters</label>
     <label class="row slideOpt" style="display:none"><span class="lbl">Slide distance</span>
       <input type="range" id="slideDist" min="50" max="600" step="10" value="200">
@@ -258,10 +286,51 @@
     <label class="row"><span class="lbl">Softness</span>
       <input type="range" id="softness" min="0" max="3" step="0.05" value="1.2">
       <output id="softnessOut">1.2</output></label>
+    </div>
+
+    <div id="liquidControls" style="display:none">
+    <label class="row"><span class="lbl">Style</span>
+      <select id="liqPreset">
+        <option value="0" selected>Dye</option>
+        <option value="1">Glass</option>
+        <option value="2">Full sim</option>
+      </select></label>
+    <label class="row"><span class="lbl">Viscosity</span>
+      <input type="range" id="liqVisc" min="0.85" max="0.995" step="0.001" value="0.92">
+      <output id="liqViscOut">0.92</output></label>
+    <label class="row"><span class="lbl">Gravity</span>
+      <input type="range" id="liqGravity" min="0" max="4" step="0.1" value="1.2">
+      <output id="liqGravityOut">1.2</output></label>
+    <label class="row"><span class="lbl">Swirl</span>
+      <input type="range" id="liqSwirl" min="0" max="3" step="0.05" value="0.8">
+      <output id="liqSwirlOut">0.8</output></label>
+    <label class="row"><span class="lbl">Injection</span>
+      <input type="range" id="liqInject" min="0" max="3" step="0.05" value="1.0">
+      <output id="liqInjectOut">1.0</output></label>
+    <label class="row"><span class="lbl">Dye decay</span>
+      <input type="range" id="liqDyeDecay" min="0.9" max="0.999" step="0.001" value="0.985">
+      <output id="liqDyeDecayOut">0.99</output></label>
+    <label class="row"><span class="lbl">Noise scale</span>
+      <input type="range" id="liqNoise" min="0.5" max="5" step="0.1" value="1.8">
+      <output id="liqNoiseOut">1.8</output></label>
+    <label class="row"><span class="lbl">Gloss</span>
+      <input type="range" id="liqGloss" min="0" max="2" step="0.05" value="0.7">
+      <output id="liqGlossOut">0.7</output></label>
+    <label class="row liqGlassOpt"><span class="lbl">Refraction</span>
+      <input type="range" id="liqRefract" min="0" max="2" step="0.05" value="0.5">
+      <output id="liqRefractOut">0.5</output></label>
+    <label class="row liqFullOpt" style="display:none"><span class="lbl">Pressure</span>
+      <input type="range" id="liqPressure" min="5" max="30" step="1" value="18">
+      <output id="liqPressureOut">18</output></label>
+    <label class="row liqFullOpt" style="display:none"><span class="lbl">Vorticity</span>
+      <input type="range" id="liqVort" min="0" max="1" step="0.05" value="0.3">
+      <output id="liqVortOut">0.30</output></label>
+    </div>
+
     <div class="btns" style="margin-top:12px">
       <button id="playBtn">Pause</button>
       <button id="seedBtn">Re-seed</button>
-      <button id="clearBtn">Clear trails</button>
+      <button id="clearBtn">Clear</button>
     </div>
     <div id="fallbackNote">Float framebuffers unavailable — using 8-bit fallback.</div>
   </div>
@@ -290,6 +359,8 @@ if (!hasFloat) document.getElementById('fallbackNote').style.display = 'block';
 const hasLinearFloat = !!gl.getExtension('OES_texture_float_linear');
 
 const W = canvas.width, H = canvas.height;
+
+const state = { playing: true, seed: Math.random() * 100, engine: 'smear', exporting: false };
 
 const VERT = `#version 300 es
 void main() {
@@ -594,6 +665,389 @@ void main() {
   outColor = vec4(col, 1.0);
 }`;
 
+// Shared sweep dissolve GLSL (used by liquid engine)
+const SWEEP_GLSL = `
+float sweepDissolve(vec2 uv, float ph) {
+  if (uSweep < 0.5) return 0.0;
+  float d = 0.0;
+  if (uSweepMode == 1) {
+    int letterIdx = uLetterCount - 1;
+    for (int i = 0; i < 31; i++) {
+      if (i >= uLetterCount - 1) break;
+      if (uv.x < uLetterStarts[i + 1]) { letterIdx = i; break; }
+    }
+    float idxf = float(letterIdx);
+    float meltStart = uSweepBase + idxf * uSweepStagger;
+    float healStart = uSweepBase + (idxf + 1.0) * uSweepStagger;
+    if (ph >= meltStart && ph < healStart)
+      d = smoothstep(meltStart, healStart, ph);
+    else if (ph >= healStart && ph < healStart + uSweepHealDur)
+      d = 1.0 - smoothstep(healStart, healStart + uSweepHealDur, ph);
+  } else if (uSweepMode == 2) {
+    float tM = max(uSweepMeltEnd, 0.001);
+    float tHS = uSweepRollHealStart;
+    float tHE = max(uSweepRollHealEnd, tHS + 0.001);
+    float e_m = ph < tM ? mix(-0.15, 1.15, ph / tM) : 1.15;
+    float e_h = ph < tHS ? -0.15
+      : (ph < tHE ? mix(-0.15, 1.15, (ph - tHS) / (tHE - tHS)) : 1.15);
+    float melted = 1.0 - smoothstep(e_m - 0.10, e_m + 0.10, uv.x);
+    float notHealed = smoothstep(e_h - 0.10, e_h + 0.10, uv.x);
+    d = melted * notHealed;
+  } else {
+    float t1 = max(uSweepMeltEnd, 0.001);
+    float t2 = max(uSweepHoldEnd, t1 + 0.001);
+    float t3 = max(uSweepHealEnd, t2 + 0.001);
+    if (ph < t1) {
+      float e = mix(-0.15, 1.15, ph / t1);
+      d = 1.0 - smoothstep(e - 0.10, e + 0.10, uv.x);
+    } else if (ph < t2) {
+      d = 1.0;
+    } else if (ph < t3) {
+      float e = mix(-0.15, 1.15, (ph - t2) / (t3 - t2));
+      d = smoothstep(e - 0.10, e + 0.10, uv.x);
+    }
+  }
+  return d;
+}`;
+
+const LIQ_ADVECT = `#version 300 es
+precision highp float;
+uniform sampler2D uField;
+uniform sampler2D uVel;
+uniform vec2 uRes;
+uniform float uDt;
+uniform int uIsDye;
+out vec4 outColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 vel = texture(uVel, uv).xy;
+  vec2 back = clamp(uv - vel * uDt, 0.001, 0.999);
+  if (uIsDye == 0) {
+    vec2 v = texture(uField, back).xy;
+    outColor = vec4(v, 0.0, 1.0);
+  } else {
+    outColor = texture(uField, back);
+  }
+}`;
+
+const LIQ_FORCES = `#version 300 es
+precision highp float;
+uniform sampler2D uVel;
+uniform sampler2D uText;
+uniform vec2 uRes;
+uniform float uDt;
+uniform float uGravity;
+uniform float uSwirl;
+uniform float uVort;
+uniform float uVisc;
+uniform float uSeed;
+uniform vec2 uFlowOff;
+uniform vec2 uMaskOff;
+uniform float uMaskScale;
+uniform float uDissolveAmt;
+uniform float uInject;
+uniform float uPhase;
+uniform float uSweep;
+uniform int uSweepMode;
+uniform float uSweepMeltEnd;
+uniform float uSweepHoldEnd;
+uniform float uSweepHealEnd;
+uniform float uSweepRollHealStart;
+uniform float uSweepRollHealEnd;
+uniform float uSweepBase;
+uniform float uSweepStagger;
+uniform float uSweepHealDur;
+uniform int uLetterCount;
+uniform float uLetterStarts[33];
+uniform int uProg;
+uniform vec2 uLightPos;
+uniform float uLightAmt;
+uniform vec2 uMouse;
+uniform vec2 uMouseVel;
+uniform float uMouseAmt;
+out vec4 outColor;
+${NOISE}
+${SWEEP_GLSL}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 p = uv * asp + uSeed;
+  vec2 vel = texture(uVel, uv).xy * uVisc;
+
+  vel.y -= uGravity * uDt;
+  vel += curl(p * 2.1 + uFlowOff) * uSwirl * uDt;
+
+  float m = fbm(p * uMaskScale + uMaskOff);
+  float mask = smoothstep(0.42, 0.58, m);
+  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
+  float sweepD = sweepDissolve(uv, uPhase);
+  mask = mix(1.0, mask * 0.2, sweepD);
+
+  if (uProg == 2) {
+    vec2 ld = (uv - uLightPos) * asp;
+    float linf = exp(-dot(ld, ld) * 42.0) * uLightAmt;
+    vel += (ld / max(length(ld), 1e-3)) * linf * 1.8;
+    mask = mix(mask, 0.0, linf * 0.92);
+  }
+
+  vec2 md = (uv - uMouse) * asp;
+  float minf = exp(-dot(md, md) * 55.0);
+  vec2 mv = uMouseVel;
+  float ml = length(mv);
+  if (ml > 8.0) mv *= 8.0 / ml;
+  vel += mv * minf * 0.04;
+  mask *= 1.0 - minf * uMouseAmt;
+
+  float txt = texture(uText, uv).a;
+  float melt = txt * (1.0 - mask) * uInject;
+  if (melt > 0.01) {
+    vec2 px = 1.5 / uRes;
+    float l = texture(uText, uv + vec2(-px.x, 0.0)).a;
+    float rgt = texture(uText, uv + vec2( px.x, 0.0)).a;
+    float d = texture(uText, uv + vec2(0.0, -px.y)).a;
+    float u = texture(uText, uv + vec2(0.0,  px.y)).a;
+    vec2 g = vec2(rgt - l, u - d);
+    float gl = length(g);
+    if (gl > 0.002) vel += g / gl * melt * 2.5;
+    vel.y -= melt * 0.8;
+  }
+
+  if (uVort > 0.001) {
+    float e = 1.0 / uRes.y;
+    float vl = texture(uVel, uv + vec2(-e, 0.0)).y;
+    float vr = texture(uVel, uv + vec2( e, 0.0)).y;
+    float vb = texture(uVel, uv + vec2(0.0, -e)).x;
+    float vt = texture(uVel, uv + vec2(0.0,  e)).x;
+    float curlV = (vr - vl - vt + vb) * 0.5;
+    vec2 n = normalize(vec2(abs(vr - vl) + abs(vt - vb) + 1e-4));
+    vel += vec2(n.y, -n.x) * curlV * uVort * 12.0 * uDt;
+  }
+
+  outColor = vec4(vel, 0.0, 1.0);
+}`;
+
+const LIQ_DIVERGENCE = `#version 300 es
+precision highp float;
+uniform sampler2D uVel;
+uniform vec2 uRes;
+out vec4 outColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 px = 0.5 / uRes;
+  float l = texture(uVel, uv - vec2(px.x, 0.0)).x;
+  float r = texture(uVel, uv + vec2(px.x, 0.0)).x;
+  float b = texture(uVel, uv - vec2(0.0, px.y)).y;
+  float t = texture(uVel, uv + vec2(0.0, px.y)).y;
+  float div = 0.5 * (r - l + t - b);
+  outColor = vec4(div, 0.0, 0.0, 1.0);
+}`;
+
+const LIQ_PRESSURE = `#version 300 es
+precision highp float;
+uniform sampler2D uPressure;
+uniform sampler2D uDiv;
+uniform vec2 uRes;
+out vec4 outColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 px = 0.5 / uRes;
+  float l = texture(uPressure, uv - vec2(px.x, 0.0)).x;
+  float r = texture(uPressure, uv + vec2(px.x, 0.0)).x;
+  float b = texture(uPressure, uv - vec2(0.0, px.y)).x;
+  float t = texture(uPressure, uv + vec2(0.0, px.y)).x;
+  float div = texture(uDiv, uv).x;
+  float p = (l + r + b + t - div) * 0.25;
+  outColor = vec4(p, 0.0, 0.0, 1.0);
+}`;
+
+const LIQ_GRADIENT = `#version 300 es
+precision highp float;
+uniform sampler2D uVel;
+uniform sampler2D uPressure;
+uniform vec2 uRes;
+out vec4 outColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 px = 0.5 / uRes;
+  float l = texture(uPressure, uv - vec2(px.x, 0.0)).x;
+  float r = texture(uPressure, uv + vec2(px.x, 0.0)).x;
+  float b = texture(uPressure, uv - vec2(0.0, px.y)).x;
+  float t = texture(uPressure, uv + vec2(0.0, px.y)).x;
+  vec2 vel = texture(uVel, uv).xy;
+  vel -= vec2(r - l, t - b) * 0.5;
+  outColor = vec4(vel, 0.0, 1.0);
+}`;
+
+const LIQ_DYE = `#version 300 es
+precision highp float;
+uniform sampler2D uDye;
+uniform sampler2D uVel;
+uniform sampler2D uText;
+uniform vec2 uRes;
+uniform vec2 uTextBounds;
+uniform float uDt;
+uniform float uDecay;
+uniform float uSeed;
+uniform vec2 uMaskOff;
+uniform float uMaskScale;
+uniform float uDissolveAmt;
+uniform float uInject;
+uniform float uPhase;
+uniform float uSweep;
+uniform int uSweepMode;
+uniform float uSweepMeltEnd;
+uniform float uSweepHoldEnd;
+uniform float uSweepHealEnd;
+uniform float uSweepRollHealStart;
+uniform float uSweepRollHealEnd;
+uniform float uSweepBase;
+uniform float uSweepStagger;
+uniform float uSweepHealDur;
+uniform int uLetterCount;
+uniform float uLetterStarts[33];
+uniform int uProg;
+uniform vec2 uLightPos;
+uniform float uLightAmt;
+uniform vec3 uColTextA;
+uniform vec3 uColTextM;
+uniform vec3 uColTextB;
+out vec4 outColor;
+${NOISE}
+${SWEEP_GLSL}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 vel = texture(uVel, uv).xy;
+  vec2 back = clamp(uv - vel * uDt, 0.001, 0.999);
+  vec4 dye = texture(uDye, back);
+  dye.rgb *= pow(uDecay, uDt * 60.0);
+  dye.a *= pow(uDecay, uDt * 60.0);
+
+  float m = fbm(uv * asp * uMaskScale + uMaskOff + uSeed);
+  float mask = smoothstep(0.42, 0.58, m);
+  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
+  float sweepD = sweepDissolve(uv, uPhase);
+  mask = mix(1.0, mask * 0.2, sweepD);
+
+  if (uProg == 2) {
+    vec2 ld = (uv - uLightPos) * asp;
+    float linf = exp(-dot(ld, ld) * 42.0) * uLightAmt;
+    mask = mix(mask, 0.0, linf * 0.92);
+  }
+
+  float txt = texture(uText, uv).a;
+  float melt = txt * (1.0 - mask) * uInject;
+  if (melt > 0.005) {
+    float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
+    vec3 textCol = mix(
+      mix(uColTextB, uColTextM, smoothstep(0.0, 0.55, gy)),
+      uColTextA,
+      smoothstep(0.55, 1.0, gy));
+    float add = melt * 1.4;
+    dye.rgb = mix(dye.rgb, textCol, add / max(dye.a + add, 1e-3));
+    dye.a = min(dye.a + add, 1.0);
+  }
+
+  outColor = dye;
+}`;
+
+const LIQ_COMPOSITE = `#version 300 es
+precision highp float;
+uniform sampler2D uDye;
+uniform sampler2D uVel;
+uniform sampler2D uText;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec2 uBgOff;
+uniform vec2 uTextBounds;
+uniform float uCrispAmt;
+uniform float uSeed;
+uniform int uPreset;
+uniform float uGloss;
+uniform float uRefract;
+uniform float uPhase;
+uniform float uSweep;
+uniform int uSweepMode;
+uniform float uSweepMeltEnd;
+uniform float uSweepHoldEnd;
+uniform float uSweepHealEnd;
+uniform float uSweepRollHealStart;
+uniform float uSweepRollHealEnd;
+uniform float uSweepBase;
+uniform float uSweepStagger;
+uniform float uSweepHealDur;
+uniform int uLetterCount;
+uniform float uLetterStarts[33];
+uniform float uMaskScale;
+uniform float uDissolveAmt;
+uniform vec2 uMaskOff;
+uniform vec3 uColRed;
+uniform vec3 uColPinkBg;
+uniform vec3 uColTextA;
+uniform vec3 uColTextM;
+uniform vec3 uColTextB;
+uniform vec3 uColGlow;
+out vec4 outColor;
+${NOISE}
+${SWEEP_GLSL}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 p = uv * asp + uSeed;
+  vec2 px = 1.5 / uRes;
+
+  vec4 dye = texture(uDye, uv);
+  vec2 vel = texture(uVel, uv).xy;
+  float txt = texture(uText, uv).a;
+
+  float g1 = fbm(p * 1.15 + uBgOff + 3.1);
+  vec3 bg = mix(uColRed, uColPinkBg, smoothstep(0.42, 0.88, g1));
+
+  float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
+  vec3 textCol = mix(
+    mix(uColTextB, uColTextM, smoothstep(0.0, 0.55, gy)),
+    uColTextA,
+    smoothstep(0.55, 1.0, gy));
+
+  float dens = dye.a;
+  vec3 liqCol = dye.rgb;
+
+  float dL = texture(uDye, uv + vec2(-px.x, 0.0)).a;
+  float dR = texture(uDye, uv + vec2( px.x, 0.0)).a;
+  float dB = texture(uDye, uv + vec2(0.0, -px.y)).a;
+  float dT = texture(uDye, uv + vec2(0.0,  px.y)).a;
+  vec2 dGrad = vec2(dR - dL, dT - dB);
+
+  vec3 col;
+  if (uPreset == 1) {
+    vec2 refr = dGrad * uRefract * 0.04;
+    vec3 rbg = mix(bg, textCol, 0.15);
+    col = mix(rbg, liqCol, clamp(dens * 1.2, 0.0, 0.85));
+    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, dens * 0.35);
+    float fres = pow(1.0 - clamp(dens, 0.0, 1.0), 2.0) * 0.4
+               + clamp(length(dGrad) * 8.0, 0.0, 0.5);
+    col = mix(col, uColGlow, fres * 0.35);
+  } else {
+    col = mix(bg, liqCol, clamp(dens * 1.15, 0.0, 1.0));
+    if (uPreset == 2) {
+      float edge = clamp(length(dGrad) * 6.0, 0.0, 1.0) * dens;
+      col *= 1.0 - edge * 0.25;
+    }
+    float spec = pow(clamp(length(vel) * 3.5, 0.0, 1.0), 3.0) * uGloss;
+    col = mix(col, uColGlow, spec * dens);
+  }
+
+  float m = fbm(p * uMaskScale + uMaskOff);
+  float mask = smoothstep(0.42, 0.58, m);
+  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
+  mask = mix(1.0, mask * 0.2, sweepDissolve(uv, uPhase));
+  float crisp = txt * mask * uCrispAmt;
+  col = mix(col, textCol, crisp);
+
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.012;
+  outColor = vec4(col, 1.0);
+}`;
+
 function compile(type, src) {
   const sh = gl.createShader(type);
   gl.shaderSource(sh, src);
@@ -620,6 +1074,13 @@ function program(fragSrc) {
 
 const feedbackProg = program(FEEDBACK);
 const compositeProg = program(COMPOSITE);
+const liqAdvectProg = program(LIQ_ADVECT);
+const liqForcesProg = program(LIQ_FORCES);
+const liqDivProg = program(LIQ_DIVERGENCE);
+const liqPressProg = program(LIQ_PRESSURE);
+const liqGradProg = program(LIQ_GRADIENT);
+const liqDyeProg = program(LIQ_DYE);
+const liqCompositeProg = program(LIQ_COMPOSITE);
 
 // ping-pong render targets
 function makeTarget() {
@@ -643,7 +1104,13 @@ function makeTarget() {
 let targets = [makeTarget(), makeTarget()];
 let cur = 0;
 
-function clearTargets() {
+let velTargets = [makeTarget(), makeTarget()];
+let dyeTargets = [makeTarget(), makeTarget()];
+let pressTargets = [makeTarget(), makeTarget()];
+let divTarget = makeTarget();
+let velCur = 0, dyeCur = 0, pressCur = 0;
+
+function clearSmearTargets() {
   for (const t of targets) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
     gl.clearColor(0, 0, 0, 1);
@@ -651,7 +1118,32 @@ function clearTargets() {
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
-clearTargets();
+
+function clearLiquidTargets() {
+  for (const arr of [velTargets, dyeTargets, pressTargets]) {
+    for (const t of arr) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, divTarget.fbo);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function clearTargets() {
+  if (state.engine === 'smear') clearSmearTargets();
+  else clearLiquidTargets();
+}
+
+function clearAllTargets() {
+  clearSmearTargets();
+  clearLiquidTargets();
+}
+
+clearAllTargets();
 
 // ---------------------------------------------------------------- text texture
 const textCanvas = document.createElement('canvas');
@@ -781,7 +1273,51 @@ function hexToRgb(hex) {
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 }
 
-const state = { playing: true, seed: Math.random() * 100 };
+const engineSettings = { smear: {}, liquid: {} };
+const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
+const liquidControlIds = ['liqPreset', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqInject', 'liqDyeDecay', 'liqNoise', 'liqGloss', 'liqRefract', 'liqPressure', 'liqVort'];
+
+function saveEngineSettings(engine) {
+  const store = engineSettings[engine];
+  const ids = engine === 'smear' ? smearControlIds : liquidControlIds;
+  for (const id of ids) {
+    const el = ui(id);
+    if (!el) continue;
+    store[id] = el.type === 'checkbox' ? el.checked : el.value;
+  }
+}
+
+function loadEngineSettings(engine) {
+  const store = engineSettings[engine];
+  const ids = engine === 'smear' ? smearControlIds : liquidControlIds;
+  for (const id of ids) {
+    const el = ui(id);
+    if (!el || !(id in store)) continue;
+    if (el.type === 'checkbox') el.checked = store[id];
+    else el.value = store[id];
+    const out = ui(id + 'Out');
+    if (out) out.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function switchEngine(engine) {
+  if (state.engine === engine) return;
+  saveEngineSettings(state.engine);
+  state.engine = engine;
+  document.querySelectorAll('.tabs .tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.engine === engine);
+  });
+  ui('smearControls').style.display = engine === 'smear' ? '' : 'none';
+  ui('liquidControls').style.display = engine === 'liquid' ? '' : 'none';
+  loadEngineSettings(engine);
+  if (engine === 'smear') { updateFlowOpts(); }
+  else { updateLiqOpts(); }
+  clearAllTargets();
+}
+
+document.querySelectorAll('.tabs .tab').forEach(btn => {
+  btn.addEventListener('click', () => switchEngine(btn.dataset.engine));
+});
 
 const sliders = [
   ['maskSpeed', v => v.toFixed(1)],
@@ -801,6 +1337,16 @@ const sliders = [
   ['sweepHold', v => v.toFixed(1) + 's'],
   ['sweepOut', v => v.toFixed(1) + 's'],
   ['sweepLead', v => v.toFixed(1) + 's'],
+  ['liqVisc', v => v.toFixed(2)],
+  ['liqGravity', v => v.toFixed(1)],
+  ['liqSwirl', v => v.toFixed(2)],
+  ['liqInject', v => v.toFixed(2)],
+  ['liqDyeDecay', v => v.toFixed(2)],
+  ['liqNoise', v => v.toFixed(1)],
+  ['liqGloss', v => v.toFixed(2)],
+  ['liqRefract', v => v.toFixed(2)],
+  ['liqPressure', v => v.toFixed(0)],
+  ['liqVort', v => v.toFixed(2)],
 ];
 for (const [id, fmt] of sliders) {
   const el = ui(id), out = ui(id + 'Out');
@@ -821,8 +1367,20 @@ ui('playBtn').addEventListener('click', () => {
   state.playing = !state.playing;
   ui('playBtn').textContent = state.playing ? 'Pause' : 'Play';
 });
-ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearTargets(); });
+ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearAllTargets(); });
 ui('clearBtn').addEventListener('click', clearTargets);
+
+ui('liqPreset').addEventListener('change', updateLiqOpts);
+function updateLiqOpts() {
+  const preset = ui('liqPreset').value;
+  document.querySelectorAll('.liqFullOpt').forEach(el => {
+    el.style.display = preset === '2' ? '' : 'none';
+  });
+  document.querySelectorAll('.liqGlassOpt').forEach(el => {
+    el.style.display = preset === '1' ? '' : 'none';
+  });
+}
+updateLiqOpts();
 
 ui('slideChk').addEventListener('change', () => {
   const on = ui('slideChk').checked;
@@ -987,12 +1545,36 @@ function programParams(phase) {
   return p;
 }
 
+function bindSweepUniforms(u, period) {
+  if (!u.uSweep) return;
+  gl.uniform1f(u.uSweep, ui('sweepChk').checked ? 1 : 0);
+  gl.uniform1i(u.uSweepMode, +ui('sweepMode').value);
+  const sw = sweepPhaseBounds(period);
+  gl.uniform1f(u.uSweepMeltEnd, sw.meltEnd);
+  gl.uniform1f(u.uSweepHoldEnd, sw.holdEnd);
+  gl.uniform1f(u.uSweepHealEnd, sw.healEnd);
+  const roll = rollingPhaseBounds(period);
+  gl.uniform1f(u.uSweepRollHealStart, roll.healStart);
+  gl.uniform1f(u.uSweepRollHealEnd, roll.healEnd);
+  const cas = cascadePhaseParams(period);
+  gl.uniform1f(u.uSweepBase, cas.base);
+  gl.uniform1f(u.uSweepStagger, cas.stagger);
+  gl.uniform1f(u.uSweepHealDur, cas.healDur);
+  gl.uniform1i(u.uLetterCount, letterCount);
+  gl.uniform1fv(u.uLetterStarts, letterStarts);
+}
+
+function liqPressureIters() {
+  const preset = +ui('liqPreset').value;
+  if (preset === 2) return +ui('liqPressure').value;
+  return preset === 1 ? 6 : 8;
+}
+
 // ---------------------------------------------------------------- render loop
 let time = 0;
 let lastT = performance.now();
 
-function renderFrame(dt) {
-  time += dt;
+function renderSmearFrame(dt) {
   const k = Math.min(1, dt * 2.2);
   const off = driftOffsets(time);
   const period = +ui('period').value;
@@ -1000,7 +1582,6 @@ function renderFrame(dt) {
   const pp = programParams(phase);
   if (ui('slideChk').checked) drawSlideFrame(phase);
 
-  // decay the paint-stroke velocity so releases fade out
   const vDecay = Math.exp(-dt * 5);
   mouse.vx *= vDecay;
   mouse.vy *= vDecay;
@@ -1008,7 +1589,6 @@ function renderFrame(dt) {
 
   gl.viewport(0, 0, W, H);
 
-  // feedback pass
   const src = targets[cur], dst = targets[1 - cur];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
   gl.useProgram(feedbackProg.pr);
@@ -1020,8 +1600,6 @@ function renderFrame(dt) {
   gl.uniform1i(fu.uPrev, 0);
   gl.uniform1i(fu.uText, 1);
   gl.uniform2f(fu.uRes, W, H);
-  // normalize decay/advection to a 60fps reference so the look is the
-  // same on 120Hz displays or throttled tabs
   const fscale = Math.min(Math.max(dt * 60, 0.25), 6);
   gl.uniform1f(fu.uDecay, Math.pow(+ui('smear').value, fscale));
   gl.uniform1f(fu.uFlow, easeVal('flow', +ui('flowSpeed').value, k) * Math.min(fscale, 2.5));
@@ -1037,21 +1615,7 @@ function renderFrame(dt) {
   gl.uniform1f(fu.uMouseAmt, mouseAmt);
   gl.uniform1i(fu.uProg, pp.prog);
   gl.uniform1f(fu.uPhase, phase);
-  gl.uniform1f(fu.uSweep, ui('sweepChk').checked ? 1 : 0);
-  gl.uniform1i(fu.uSweepMode, +ui('sweepMode').value);
-  const sw = sweepPhaseBounds(period);
-  gl.uniform1f(fu.uSweepMeltEnd, sw.meltEnd);
-  gl.uniform1f(fu.uSweepHoldEnd, sw.holdEnd);
-  gl.uniform1f(fu.uSweepHealEnd, sw.healEnd);
-  const roll = rollingPhaseBounds(period);
-  gl.uniform1f(fu.uSweepRollHealStart, roll.healStart);
-  gl.uniform1f(fu.uSweepRollHealEnd, roll.healEnd);
-  const cas = cascadePhaseParams(period);
-  gl.uniform1f(fu.uSweepBase, cas.base);
-  gl.uniform1f(fu.uSweepStagger, cas.stagger);
-  gl.uniform1f(fu.uSweepHealDur, cas.healDur);
-  gl.uniform1i(fu.uLetterCount, letterCount);
-  gl.uniform1fv(fu.uLetterStarts, letterStarts);
+  bindSweepUniforms(fu, period);
   gl.uniform1f(fu.uInject, pp.inject);
   gl.uniform1f(fu.uDissolveAmt, pp.dissolve);
   gl.uniform2f(fu.uLightPos, pp.lightPos[0], pp.lightPos[1]);
@@ -1061,7 +1625,6 @@ function renderFrame(dt) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   cur = 1 - cur;
 
-  // composite pass
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(compositeProg.pr);
   gl.activeTexture(gl.TEXTURE0);
@@ -1089,6 +1652,196 @@ function renderFrame(dt) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
+function renderLiquidFrame(dt) {
+  const k = Math.min(1, dt * 2.2);
+  const off = driftOffsets(time);
+  const period = +ui('period').value;
+  const phase = ((time % period) + period) % period / period;
+  const pp = programParams(phase);
+
+  const vDecay = Math.exp(-dt * 5);
+  mouse.vx *= vDecay;
+  mouse.vy *= vDecay;
+  const mouseAmt = easeVal('mamt', mouse.down ? 1 : 0, Math.min(1, dt * 8));
+  const fscale = Math.min(Math.max(dt * 60, 0.25), 6);
+  const simDt = dt * Math.min(fscale, 2.0);
+
+  gl.viewport(0, 0, W, H);
+
+  // 1. Add forces to velocity
+  const vSrc = velTargets[velCur], vDst = velTargets[1 - velCur];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, vDst.fbo);
+  gl.useProgram(liqForcesProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, vSrc.tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  const ff = liqForcesProg.u;
+  gl.uniform1i(ff.uVel, 0);
+  gl.uniform1i(ff.uText, 1);
+  gl.uniform2f(ff.uRes, W, H);
+  gl.uniform1f(ff.uDt, simDt);
+  gl.uniform1f(ff.uGravity, easeVal('lgrav', +ui('liqGravity').value, k));
+  gl.uniform1f(ff.uSwirl, easeVal('lswirl', +ui('liqSwirl').value, k));
+  gl.uniform1f(ff.uVort, +ui('liqPreset').value === '2' ? +ui('liqVort').value : 0);
+  gl.uniform1f(ff.uVisc, easeVal('lvisc', +ui('liqVisc').value, k));
+  gl.uniform1f(ff.uSeed, state.seed);
+  gl.uniform2f(ff.uFlowOff, off.flow[0], off.flow[1]);
+  gl.uniform2f(ff.uMaskOff, off.mask[0], off.mask[1]);
+  gl.uniform1f(ff.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
+  gl.uniform1f(ff.uDissolveAmt, pp.dissolve);
+  gl.uniform1f(ff.uInject, pp.inject * easeVal('linj', +ui('liqInject').value, k));
+  gl.uniform1f(ff.uPhase, phase);
+  bindSweepUniforms(ff, period);
+  gl.uniform1i(ff.uProg, pp.prog);
+  gl.uniform2f(ff.uLightPos, pp.lightPos[0], pp.lightPos[1]);
+  gl.uniform1f(ff.uLightAmt, pp.lightAmt);
+  gl.uniform2f(ff.uMouse, mouse.x, mouse.y);
+  gl.uniform2f(ff.uMouseVel, mouse.vx, mouse.vy);
+  gl.uniform1f(ff.uMouseAmt, mouseAmt);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  velCur = 1 - velCur;
+
+  // 2. Advect velocity
+  const vA = velTargets[velCur], vB = velTargets[1 - velCur];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, vB.fbo);
+  gl.useProgram(liqAdvectProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, vA.tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, vA.tex);
+  const la = liqAdvectProg.u;
+  gl.uniform1i(la.uField, 0);
+  gl.uniform1i(la.uVel, 1);
+  gl.uniform2f(la.uRes, W, H);
+  gl.uniform1f(la.uDt, simDt);
+  gl.uniform1i(la.uIsDye, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  velCur = 1 - velCur;
+
+  // 3. Divergence
+  gl.bindFramebuffer(gl.FRAMEBUFFER, divTarget.fbo);
+  gl.useProgram(liqDivProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, velTargets[velCur].tex);
+  const ld = liqDivProg.u;
+  gl.uniform1i(ld.uVel, 0);
+  gl.uniform2f(ld.uRes, W, H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // 4. Pressure solve (Jacobi)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, pressTargets[0].fbo);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  pressCur = 0;
+  const iters = liqPressureIters();
+  for (let i = 0; i < iters; i++) {
+    const pSrc = pressTargets[pressCur], pDst = pressTargets[1 - pressCur];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pDst.fbo);
+    gl.useProgram(liqPressProg.pr);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, pSrc.tex);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, divTarget.tex);
+    const lp = liqPressProg.u;
+    gl.uniform1i(lp.uPressure, 0);
+    gl.uniform1i(lp.uDiv, 1);
+    gl.uniform2f(lp.uRes, W, H);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    pressCur = 1 - pressCur;
+  }
+
+  // 5. Subtract pressure gradient
+  const vG = velTargets[velCur], vG2 = velTargets[1 - velCur];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, vG2.fbo);
+  gl.useProgram(liqGradProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, vG.tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, pressTargets[pressCur].tex);
+  const lg = liqGradProg.u;
+  gl.uniform1i(lg.uVel, 0);
+  gl.uniform1i(lg.uPressure, 1);
+  gl.uniform2f(lg.uRes, W, H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  velCur = 1 - velCur;
+
+  // 6. Advect + inject dye
+  const dSrc = dyeTargets[dyeCur], dDst = dyeTargets[1 - dyeCur];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dDst.fbo);
+  gl.useProgram(liqDyeProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, dSrc.tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, velTargets[velCur].tex);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  const ldy = liqDyeProg.u;
+  gl.uniform1i(ldy.uDye, 0);
+  gl.uniform1i(ldy.uVel, 1);
+  gl.uniform1i(ldy.uText, 2);
+  gl.uniform2f(ldy.uRes, W, H);
+  gl.uniform2f(ldy.uTextBounds, textBounds[0], textBounds[1]);
+  gl.uniform1f(ldy.uDt, simDt);
+  gl.uniform1f(ldy.uDecay, easeVal('ldecay', +ui('liqDyeDecay').value, k));
+  gl.uniform1f(ldy.uSeed, state.seed);
+  gl.uniform2f(ldy.uMaskOff, off.mask[0], off.mask[1]);
+  gl.uniform1f(ldy.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
+  gl.uniform1f(ldy.uDissolveAmt, pp.dissolve);
+  gl.uniform1f(ldy.uInject, pp.inject * easeVal('linj', +ui('liqInject').value, k));
+  gl.uniform1f(ldy.uPhase, phase);
+  bindSweepUniforms(ldy, period);
+  gl.uniform1i(ldy.uProg, pp.prog);
+  gl.uniform2f(ldy.uLightPos, pp.lightPos[0], pp.lightPos[1]);
+  gl.uniform1f(ldy.uLightAmt, pp.lightAmt);
+  gl.uniform3fv(ldy.uColTextA, easeColor('txa', ui('colTextA').value, k));
+  gl.uniform3fv(ldy.uColTextM, easeColor('txm', ui('colTextM').value, k));
+  gl.uniform3fv(ldy.uColTextB, easeColor('txb', ui('colTextB').value, k));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  dyeCur = 1 - dyeCur;
+
+  // 7. Composite to screen
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.useProgram(liqCompositeProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, dyeTargets[dyeCur].tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, velTargets[velCur].tex);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  const lc = liqCompositeProg.u;
+  gl.uniform1i(lc.uDye, 0);
+  gl.uniform1i(lc.uVel, 1);
+  gl.uniform1i(lc.uText, 2);
+  gl.uniform2f(lc.uRes, W, H);
+  gl.uniform1f(lc.uTime, off.grainT);
+  gl.uniform2f(lc.uBgOff, off.bg[0], off.bg[1]);
+  gl.uniform2f(lc.uTextBounds, textBounds[0], textBounds[1]);
+  gl.uniform1f(lc.uCrispAmt, pp.crisp);
+  gl.uniform1f(lc.uSeed, state.seed);
+  gl.uniform1i(lc.uPreset, +ui('liqPreset').value);
+  gl.uniform1f(lc.uGloss, easeVal('lgloss', +ui('liqGloss').value, k));
+  gl.uniform1f(lc.uRefract, easeVal('lrefr', +ui('liqRefract').value, k));
+  gl.uniform1f(lc.uPhase, phase);
+  bindSweepUniforms(lc, period);
+  gl.uniform1f(lc.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
+  gl.uniform1f(lc.uDissolveAmt, pp.dissolve);
+  gl.uniform2f(lc.uMaskOff, off.mask[0], off.mask[1]);
+  gl.uniform3fv(lc.uColRed, easeColor('red', ui('colRed').value, k));
+  gl.uniform3fv(lc.uColPinkBg, easeColor('pink', ui('colPinkBg').value, k));
+  gl.uniform3fv(lc.uColTextA, easeColor('txa', ui('colTextA').value, k));
+  gl.uniform3fv(lc.uColTextM, easeColor('txm', ui('colTextM').value, k));
+  gl.uniform3fv(lc.uColTextB, easeColor('txb', ui('colTextB').value, k));
+  gl.uniform3fv(lc.uColGlow, easeColor('glow', ui('colGlow').value, k));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function renderFrame(dt) {
+  time += dt;
+  if (state.engine === 'liquid') renderLiquidFrame(dt);
+  else renderSmearFrame(dt);
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - lastT) / 1000, 0.1);
@@ -1112,10 +1865,14 @@ function exportFilename(ext) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'none';
   const text = (ui('textInput').value || 'text').trim()
     .replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '-').slice(0, 48);
-  const flow = slug(ui('flowMode').selectedOptions[0].textContent);
   const sweep = ui('sweepChk').checked
     ? slug(ui('sweepMode').selectedOptions[0].textContent)
     : 'no-sweep';
+  if (state.engine === 'liquid') {
+    const style = slug(ui('liqPreset').selectedOptions[0].textContent);
+    return `cosmos-liquid-${text}-${sweep}-${style}-${T}s-loop.${ext}`;
+  }
+  const flow = slug(ui('flowMode').selectedOptions[0].textContent);
   return `cosmos-smear-${text}-${sweep}-${flow}-${T}s-loop.${ext}`;
 }
 
@@ -1195,6 +1952,8 @@ ui('exportBtn').addEventListener('click', exportVideo);
 
 redrawText();
 document.fonts.ready.then(redrawText);
+saveEngineSettings('smear');
+saveEngineSettings('liquid');
 requestAnimationFrame(frame);
 </script>
 </body>
