@@ -289,36 +289,43 @@
     </div>
 
     <div id="liquidControls" style="display:none">
-    <label class="row"><span class="lbl">Style</span>
+    <div class="hint" style="margin:0 0 10px">Letters are liquid — sweep choreographs them forming and breaking apart.</div>
+    <label class="row"><span class="lbl">Material</span>
       <select id="liqPreset">
-        <option value="0" selected>Dye</option>
-        <option value="1">Glass</option>
+        <option value="0" selected>Water</option>
+        <option value="1">Mercury</option>
         <option value="2">Full sim</option>
       </select></label>
+    <label class="row"><span class="lbl">Cohesion</span>
+      <input type="range" id="liqCohesion" min="0" max="4" step="0.05" value="1.8">
+      <output id="liqCohesionOut">1.8</output></label>
+    <label class="row"><span class="lbl">Form strength</span>
+      <input type="range" id="liqForm" min="0" max="3" step="0.05" value="1.4">
+      <output id="liqFormOut">1.4</output></label>
+    <label class="row"><span class="lbl">Surface tension</span>
+      <input type="range" id="liqTension" min="0" max="3" step="0.05" value="1.0">
+      <output id="liqTensionOut">1.0</output></label>
     <label class="row"><span class="lbl">Viscosity</span>
-      <input type="range" id="liqVisc" min="0.85" max="0.995" step="0.001" value="0.92">
-      <output id="liqViscOut">0.92</output></label>
+      <input type="range" id="liqVisc" min="0.85" max="0.995" step="0.001" value="0.965">
+      <output id="liqViscOut">0.97</output></label>
     <label class="row"><span class="lbl">Gravity</span>
-      <input type="range" id="liqGravity" min="0" max="4" step="0.1" value="1.2">
-      <output id="liqGravityOut">1.2</output></label>
+      <input type="range" id="liqGravity" min="0" max="4" step="0.1" value="0.5">
+      <output id="liqGravityOut">0.5</output></label>
     <label class="row"><span class="lbl">Swirl</span>
-      <input type="range" id="liqSwirl" min="0" max="3" step="0.05" value="0.8">
-      <output id="liqSwirlOut">0.8</output></label>
-    <label class="row"><span class="lbl">Injection</span>
-      <input type="range" id="liqInject" min="0" max="3" step="0.05" value="1.0">
-      <output id="liqInjectOut">1.0</output></label>
-    <label class="row"><span class="lbl">Dye decay</span>
-      <input type="range" id="liqDyeDecay" min="0.9" max="0.999" step="0.001" value="0.985">
+      <input type="range" id="liqSwirl" min="0" max="3" step="0.05" value="0.4">
+      <output id="liqSwirlOut">0.40</output></label>
+    <label class="row"><span class="lbl">Fill rate</span>
+      <input type="range" id="liqFill" min="0" max="3" step="0.05" value="1.2">
+      <output id="liqFillOut">1.2</output></label>
+    <label class="row"><span class="lbl">Persistence</span>
+      <input type="range" id="liqDyeDecay" min="0.9" max="0.999" step="0.001" value="0.993">
       <output id="liqDyeDecayOut">0.99</output></label>
-    <label class="row"><span class="lbl">Noise scale</span>
-      <input type="range" id="liqNoise" min="0.5" max="5" step="0.1" value="1.8">
-      <output id="liqNoiseOut">1.8</output></label>
     <label class="row"><span class="lbl">Gloss</span>
-      <input type="range" id="liqGloss" min="0" max="2" step="0.05" value="0.7">
-      <output id="liqGlossOut">0.7</output></label>
-    <label class="row liqGlassOpt"><span class="lbl">Refraction</span>
-      <input type="range" id="liqRefract" min="0" max="2" step="0.05" value="0.5">
-      <output id="liqRefractOut">0.5</output></label>
+      <input type="range" id="liqGloss" min="0" max="2" step="0.05" value="1.0">
+      <output id="liqGlossOut">1.0</output></label>
+    <label class="row liqWaterOpt"><span class="lbl">Refraction</span>
+      <input type="range" id="liqRefract" min="0" max="2" step="0.05" value="0.6">
+      <output id="liqRefractOut">0.6</output></label>
     <label class="row liqFullOpt" style="display:none"><span class="lbl">Pressure</span>
       <input type="range" id="liqPressure" min="5" max="30" step="1" value="18">
       <output id="liqPressureOut">18</output></label>
@@ -708,6 +715,17 @@ float sweepDissolve(vec2 uv, float ph) {
     }
   }
   return d;
+}
+float liquidForm(vec2 uv, float ph) {
+  return clamp(1.0 - sweepDissolve(uv, ph), 0.0, 1.0);
+}
+vec2 textGrad(sampler2D tex, vec2 uv, vec2 res) {
+  vec2 px = 2.5 / res;
+  float l = texture(tex, uv + vec2(-px.x, 0.0)).a;
+  float r = texture(tex, uv + vec2( px.x, 0.0)).a;
+  float b = texture(tex, uv + vec2(0.0, -px.y)).a;
+  float t = texture(tex, uv + vec2(0.0,  px.y)).a;
+  return vec2(r - l, t - b);
 }`;
 
 const LIQ_ADVECT = `#version 300 es
@@ -733,6 +751,7 @@ void main() {
 const LIQ_FORCES = `#version 300 es
 precision highp float;
 uniform sampler2D uVel;
+uniform sampler2D uDye;
 uniform sampler2D uText;
 uniform vec2 uRes;
 uniform float uDt;
@@ -742,10 +761,9 @@ uniform float uVort;
 uniform float uVisc;
 uniform float uSeed;
 uniform vec2 uFlowOff;
-uniform vec2 uMaskOff;
-uniform float uMaskScale;
-uniform float uDissolveAmt;
-uniform float uInject;
+uniform float uCohesion;
+uniform float uFormStr;
+uniform float uTension;
 uniform float uPhase;
 uniform float uSweep;
 uniform int uSweepMode;
@@ -774,20 +792,39 @@ void main() {
   vec2 p = uv * asp + uSeed;
   vec2 vel = texture(uVel, uv).xy * uVisc;
 
-  vel.y -= uGravity * uDt;
-  vel += curl(p * 2.1 + uFlowOff) * uSwirl * uDt;
+  float form = liquidForm(uv, uPhase) * uFormStr;
+  float scatter = clamp(1.0 - form, 0.0, 1.0);
+  float txt = texture(uText, uv).a;
+  float dens = texture(uDye, uv).a;
+  vec2 tg = textGrad(uText, uv, uRes);
+  float tgL = length(tg);
 
-  float m = fbm(p * uMaskScale + uMaskOff);
-  float mask = smoothstep(0.42, 0.58, m);
-  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
-  float sweepD = sweepDissolve(uv, uPhase);
-  mask = mix(1.0, mask * 0.2, sweepD);
+  vel.y -= uGravity * uDt * (1.0 - form * txt * 0.9);
+
+  // pull loose fluid toward glyph strokes so letters coalesce
+  if (tgL > 1e-4) {
+    vec2 dir = tg / tgL;
+    vel += dir * uCohesion * form * (0.5 + 0.5 * (1.0 - txt)) * uDt * 18.0;
+    vel += tg * uCohesion * form * txt * uDt * 28.0;
+  }
+
+  // break apart / slosh when melting
+  vel -= tg * scatter * uCohesion * uDt * 10.0;
+  vel += curl(p * 2.1 + uFlowOff) * (uSwirl * scatter + uSwirl * 0.15) * uDt;
+
+  // surface tension from density laplacian
+  vec2 dpx = 2.0 / uRes;
+  float dL = texture(uDye, uv + vec2(-dpx.x, 0.0)).a;
+  float dR = texture(uDye, uv + vec2( dpx.x, 0.0)).a;
+  float dB = texture(uDye, uv + vec2(0.0, -dpx.y)).a;
+  float dT = texture(uDye, uv + vec2(0.0,  dpx.y)).a;
+  float lap = (dL + dR + dB + dT) - 4.0 * dens;
+  vel -= vec2(dR - dL, dT - dB) * lap * uTension * uDt * 22.0;
 
   if (uProg == 2) {
     vec2 ld = (uv - uLightPos) * asp;
     float linf = exp(-dot(ld, ld) * 42.0) * uLightAmt;
-    vel += (ld / max(length(ld), 1e-3)) * linf * 1.8;
-    mask = mix(mask, 0.0, linf * 0.92);
+    vel += (ld / max(length(ld), 1e-3)) * linf * 1.4;
   }
 
   vec2 md = (uv - uMouse) * asp;
@@ -795,22 +832,8 @@ void main() {
   vec2 mv = uMouseVel;
   float ml = length(mv);
   if (ml > 8.0) mv *= 8.0 / ml;
-  vel += mv * minf * 0.04;
-  mask *= 1.0 - minf * uMouseAmt;
-
-  float txt = texture(uText, uv).a;
-  float melt = txt * (1.0 - mask) * uInject;
-  if (melt > 0.01) {
-    vec2 px = 1.5 / uRes;
-    float l = texture(uText, uv + vec2(-px.x, 0.0)).a;
-    float rgt = texture(uText, uv + vec2( px.x, 0.0)).a;
-    float d = texture(uText, uv + vec2(0.0, -px.y)).a;
-    float u = texture(uText, uv + vec2(0.0,  px.y)).a;
-    vec2 g = vec2(rgt - l, u - d);
-    float gl = length(g);
-    if (gl > 0.002) vel += g / gl * melt * 2.5;
-    vel.y -= melt * 0.8;
-  }
+  vel += mv * minf * 0.06;
+  vel += curl(md * 6.0) * minf * uMouseAmt * 0.8;
 
   if (uVort > 0.001) {
     float e = 1.0 / uRes.y;
@@ -888,11 +911,10 @@ uniform vec2 uTextBounds;
 uniform float uDt;
 uniform float uDecay;
 uniform float uSeed;
-uniform vec2 uMaskOff;
-uniform float uMaskScale;
-uniform float uDissolveAmt;
-uniform float uInject;
+uniform float uFill;
+uniform float uFormStr;
 uniform float uPhase;
+uniform float uBootstrap;
 uniform float uSweep;
 uniform int uSweepMode;
 uniform float uSweepMeltEnd;
@@ -905,9 +927,6 @@ uniform float uSweepStagger;
 uniform float uSweepHealDur;
 uniform int uLetterCount;
 uniform float uLetterStarts[33];
-uniform int uProg;
-uniform vec2 uLightPos;
-uniform float uLightAmt;
 uniform vec3 uColTextA;
 uniform vec3 uColTextM;
 uniform vec3 uColTextB;
@@ -916,36 +935,43 @@ ${NOISE}
 ${SWEEP_GLSL}
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
   vec2 vel = texture(uVel, uv).xy;
   vec2 back = clamp(uv - vel * uDt, 0.001, 0.999);
   vec4 dye = texture(uDye, back);
   dye.rgb *= pow(uDecay, uDt * 60.0);
   dye.a *= pow(uDecay, uDt * 60.0);
 
-  float m = fbm(uv * asp * uMaskScale + uMaskOff + uSeed);
-  float mask = smoothstep(0.42, 0.58, m);
-  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
-  float sweepD = sweepDissolve(uv, uPhase);
-  mask = mix(1.0, mask * 0.2, sweepD);
-
-  if (uProg == 2) {
-    vec2 ld = (uv - uLightPos) * asp;
-    float linf = exp(-dot(ld, ld) * 42.0) * uLightAmt;
-    mask = mix(mask, 0.0, linf * 0.92);
-  }
-
+  float form = liquidForm(uv, uPhase) * uFormStr;
+  float scatter = clamp(1.0 - form, 0.0, 1.0);
   float txt = texture(uText, uv).a;
-  float melt = txt * (1.0 - mask) * uInject;
-  if (melt > 0.005) {
-    float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
-    vec3 textCol = mix(
-      mix(uColTextB, uColTextM, smoothstep(0.0, 0.55, gy)),
-      uColTextA,
-      smoothstep(0.55, 1.0, gy));
-    float add = melt * 1.4;
+
+  float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
+  vec3 textCol = mix(
+    mix(uColTextB, uColTextM, smoothstep(0.0, 0.55, gy)),
+    uColTextA,
+    smoothstep(0.55, 1.0, gy));
+
+  // fill letter volume with liquid when forming
+  float target = txt * form * uFill;
+  float deficit = max(target - dye.a, 0.0);
+  if (deficit > 0.001) {
+    float add = deficit * 5.5;
     dye.rgb = mix(dye.rgb, textCol, add / max(dye.a + add, 1e-3));
     dye.a = min(dye.a + add, 1.0);
+  }
+
+  // erode letter liquid when breaking apart
+  dye.a *= 1.0 - scatter * txt * 0.12 * uDt * 60.0;
+
+  // seed scattered droplets so animation can coalesce into letters
+  if (uBootstrap > 0.01) {
+    vec2 cell = floor(uv * vec2(52.0, 64.0));
+    float h = hash(cell + uSeed);
+    if (h > 0.93) {
+      float blob = smoothstep(0.93, 0.99, h) * uBootstrap;
+      dye.a = max(dye.a, blob * 0.55);
+      dye.rgb = mix(dye.rgb, textCol, blob * 0.7);
+    }
   }
 
   outColor = dye;
@@ -960,27 +986,11 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform vec2 uBgOff;
 uniform vec2 uTextBounds;
-uniform float uCrispAmt;
 uniform float uSeed;
 uniform int uPreset;
 uniform float uGloss;
 uniform float uRefract;
-uniform float uPhase;
-uniform float uSweep;
-uniform int uSweepMode;
-uniform float uSweepMeltEnd;
-uniform float uSweepHoldEnd;
-uniform float uSweepHealEnd;
-uniform float uSweepRollHealStart;
-uniform float uSweepRollHealEnd;
-uniform float uSweepBase;
-uniform float uSweepStagger;
-uniform float uSweepHealDur;
-uniform int uLetterCount;
-uniform float uLetterStarts[33];
-uniform float uMaskScale;
-uniform float uDissolveAmt;
-uniform vec2 uMaskOff;
+uniform float uTension;
 uniform vec3 uColRed;
 uniform vec3 uColPinkBg;
 uniform vec3 uColTextA;
@@ -989,16 +999,24 @@ uniform vec3 uColTextB;
 uniform vec3 uColGlow;
 out vec4 outColor;
 ${NOISE}
-${SWEEP_GLSL}
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 asp = vec2(uRes.x / uRes.y, 1.0);
   vec2 p = uv * asp + uSeed;
-  vec2 px = 1.5 / uRes;
+  vec2 px = 3.0 / uRes;
 
   vec4 dye = texture(uDye, uv);
   vec2 vel = texture(uVel, uv).xy;
-  float txt = texture(uText, uv).a;
+  float dens = dye.a;
+
+  float dL = texture(uDye, uv + vec2(-px.x, 0.0)).a;
+  float dR = texture(uDye, uv + vec2( px.x, 0.0)).a;
+  float dB = texture(uDye, uv + vec2(0.0, -px.y)).a;
+  float dT = texture(uDye, uv + vec2(0.0,  px.y)).a;
+  float blur = (dens + dL + dR + dB + dT) * 0.2;
+  vec2 dGrad = vec2(dR - dL, dT - dB);
+  vec3 n = normalize(vec3(dGrad.x, dGrad.y, 0.14 / asp.x + uTension * 0.04));
+  float facing = clamp(n.z, 0.0, 1.0);
 
   float g1 = fbm(p * 1.15 + uBgOff + 3.1);
   vec3 bg = mix(uColRed, uColPinkBg, smoothstep(0.42, 0.88, g1));
@@ -1009,40 +1027,36 @@ void main() {
     uColTextA,
     smoothstep(0.55, 1.0, gy));
 
-  float dens = dye.a;
-  vec3 liqCol = dye.rgb;
+  vec3 liqCol = (dens > 0.01) ? dye.rgb / dens : textCol;
+  float alpha = smoothstep(0.03, 0.42, blur);
+  vec3 col = bg;
 
-  float dL = texture(uDye, uv + vec2(-px.x, 0.0)).a;
-  float dR = texture(uDye, uv + vec2( px.x, 0.0)).a;
-  float dB = texture(uDye, uv + vec2(0.0, -px.y)).a;
-  float dT = texture(uDye, uv + vec2(0.0,  px.y)).a;
-  vec2 dGrad = vec2(dR - dL, dT - dB);
-
-  vec3 col;
   if (uPreset == 1) {
-    vec2 refr = dGrad * uRefract * 0.04;
-    vec3 rbg = mix(bg, textCol, 0.15);
-    col = mix(rbg, liqCol, clamp(dens * 1.2, 0.0, 0.85));
-    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, dens * 0.35);
-    float fres = pow(1.0 - clamp(dens, 0.0, 1.0), 2.0) * 0.4
-               + clamp(length(dGrad) * 8.0, 0.0, 0.5);
-    col = mix(col, uColGlow, fres * 0.35);
+    // Mercury — metallic blobs, dark meniscus edges
+    vec3 refl = mix(uColGlow * 0.25 + liqCol * 0.35, liqCol, facing);
+    col = mix(col, mix(liqCol, refl, 0.72), alpha);
+    float spec = pow(max(dot(n, normalize(vec3(-0.35, 0.65, 0.95))), 0.0), 55.0);
+    col += vec3(1.0) * spec * uGloss * 1.6 * alpha;
+    col *= 1.0 - (1.0 - facing) * 0.4 * alpha;
+  } else if (uPreset == 0) {
+    // Water — translucent body, fresnel rim, ripple highlights
+    vec2 refr = dGrad * uRefract * 0.05;
+    vec3 rbg = mix(bg, textCol, 0.08);
+    col = mix(rbg, liqCol, alpha * 0.82);
+    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, alpha * 0.25);
+    float fres = pow(1.0 - facing, 2.5);
+    col = mix(col, uColGlow, fres * uGloss * 0.45 * alpha);
+    float spec = pow(max(dot(n, normalize(vec3(0.25, 0.55, 1.0))), 0.0), 36.0);
+    col += uColGlow * spec * uGloss * 0.7 * alpha;
   } else {
-    col = mix(bg, liqCol, clamp(dens * 1.15, 0.0, 1.0));
-    if (uPreset == 2) {
-      float edge = clamp(length(dGrad) * 6.0, 0.0, 1.0) * dens;
-      col *= 1.0 - edge * 0.25;
-    }
-    float spec = pow(clamp(length(vel) * 3.5, 0.0, 1.0), 3.0) * uGloss;
-    col = mix(col, uColGlow, spec * dens);
+    // Full sim — richer meniscus + motion specular
+    col = mix(col, liqCol, alpha);
+    float edge = clamp(length(dGrad) * 7.0, 0.0, 1.0) * alpha;
+    col *= 1.0 - edge * 0.3;
+    float spec = pow(clamp(length(vel) * 4.0, 0.0, 1.0), 2.5) * uGloss;
+    col = mix(col, uColGlow, spec * alpha);
+    col = mix(col, uColGlow, pow(1.0 - facing, 3.0) * 0.25 * alpha);
   }
-
-  float m = fbm(p * uMaskScale + uMaskOff);
-  float mask = smoothstep(0.42, 0.58, m);
-  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
-  mask = mix(1.0, mask * 0.2, sweepDissolve(uv, uPhase));
-  float crisp = txt * mask * uCrispAmt;
-  col = mix(col, textCol, crisp);
 
   col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.012;
   outColor = vec4(col, 1.0);
@@ -1109,6 +1123,7 @@ let dyeTargets = [makeTarget(), makeTarget()];
 let pressTargets = [makeTarget(), makeTarget()];
 let divTarget = makeTarget();
 let velCur = 0, dyeCur = 0, pressCur = 0;
+let liqBootstrap = 0;
 
 function clearSmearTargets() {
   for (const t of targets) {
@@ -1131,6 +1146,7 @@ function clearLiquidTargets() {
   gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  liqBootstrap = 1.0;
 }
 
 function clearTargets() {
@@ -1275,7 +1291,7 @@ function hexToRgb(hex) {
 
 const engineSettings = { smear: {}, liquid: {} };
 const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
-const liquidControlIds = ['liqPreset', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqInject', 'liqDyeDecay', 'liqNoise', 'liqGloss', 'liqRefract', 'liqPressure', 'liqVort'];
+const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqRefract', 'liqPressure', 'liqVort'];
 
 function saveEngineSettings(engine) {
   const store = engineSettings[engine];
@@ -1311,7 +1327,7 @@ function switchEngine(engine) {
   ui('liquidControls').style.display = engine === 'liquid' ? '' : 'none';
   loadEngineSettings(engine);
   if (engine === 'smear') { updateFlowOpts(); }
-  else { updateLiqOpts(); }
+  else { updateLiqOpts(); liqBootstrap = 1.0; }
   clearAllTargets();
 }
 
@@ -1340,9 +1356,11 @@ const sliders = [
   ['liqVisc', v => v.toFixed(2)],
   ['liqGravity', v => v.toFixed(1)],
   ['liqSwirl', v => v.toFixed(2)],
-  ['liqInject', v => v.toFixed(2)],
+  ['liqCohesion', v => v.toFixed(2)],
+  ['liqForm', v => v.toFixed(2)],
+  ['liqTension', v => v.toFixed(2)],
+  ['liqFill', v => v.toFixed(2)],
   ['liqDyeDecay', v => v.toFixed(2)],
-  ['liqNoise', v => v.toFixed(1)],
   ['liqGloss', v => v.toFixed(2)],
   ['liqRefract', v => v.toFixed(2)],
   ['liqPressure', v => v.toFixed(0)],
@@ -1376,8 +1394,8 @@ function updateLiqOpts() {
   document.querySelectorAll('.liqFullOpt').forEach(el => {
     el.style.display = preset === '2' ? '' : 'none';
   });
-  document.querySelectorAll('.liqGlassOpt').forEach(el => {
-    el.style.display = preset === '1' ? '' : 'none';
+  document.querySelectorAll('.liqWaterOpt').forEach(el => {
+    el.style.display = preset === '0' ? '' : 'none';
   });
 }
 updateLiqOpts();
@@ -1665,6 +1683,7 @@ function renderLiquidFrame(dt) {
   const mouseAmt = easeVal('mamt', mouse.down ? 1 : 0, Math.min(1, dt * 8));
   const fscale = Math.min(Math.max(dt * 60, 0.25), 6);
   const simDt = dt * Math.min(fscale, 2.0);
+  if (liqBootstrap > 0) liqBootstrap = Math.max(0, liqBootstrap - dt * 0.55);
 
   gl.viewport(0, 0, W, H);
 
@@ -1675,10 +1694,13 @@ function renderLiquidFrame(dt) {
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, vSrc.tex);
   gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, dyeTargets[dyeCur].tex);
+  gl.activeTexture(gl.TEXTURE2);
   gl.bindTexture(gl.TEXTURE_2D, textTex);
   const ff = liqForcesProg.u;
   gl.uniform1i(ff.uVel, 0);
-  gl.uniform1i(ff.uText, 1);
+  gl.uniform1i(ff.uDye, 1);
+  gl.uniform1i(ff.uText, 2);
   gl.uniform2f(ff.uRes, W, H);
   gl.uniform1f(ff.uDt, simDt);
   gl.uniform1f(ff.uGravity, easeVal('lgrav', +ui('liqGravity').value, k));
@@ -1687,10 +1709,9 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ff.uVisc, easeVal('lvisc', +ui('liqVisc').value, k));
   gl.uniform1f(ff.uSeed, state.seed);
   gl.uniform2f(ff.uFlowOff, off.flow[0], off.flow[1]);
-  gl.uniform2f(ff.uMaskOff, off.mask[0], off.mask[1]);
-  gl.uniform1f(ff.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
-  gl.uniform1f(ff.uDissolveAmt, pp.dissolve);
-  gl.uniform1f(ff.uInject, pp.inject * easeVal('linj', +ui('liqInject').value, k));
+  gl.uniform1f(ff.uCohesion, easeVal('lcoh', +ui('liqCohesion').value, k));
+  gl.uniform1f(ff.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
+  gl.uniform1f(ff.uTension, easeVal('ltens', +ui('liqTension').value, k));
   gl.uniform1f(ff.uPhase, phase);
   bindSweepUniforms(ff, period);
   gl.uniform1i(ff.uProg, pp.prog);
@@ -1785,15 +1806,11 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ldy.uDt, simDt);
   gl.uniform1f(ldy.uDecay, easeVal('ldecay', +ui('liqDyeDecay').value, k));
   gl.uniform1f(ldy.uSeed, state.seed);
-  gl.uniform2f(ldy.uMaskOff, off.mask[0], off.mask[1]);
-  gl.uniform1f(ldy.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
-  gl.uniform1f(ldy.uDissolveAmt, pp.dissolve);
-  gl.uniform1f(ldy.uInject, pp.inject * easeVal('linj', +ui('liqInject').value, k));
+  gl.uniform1f(ldy.uFill, easeVal('lfill', +ui('liqFill').value, k));
+  gl.uniform1f(ldy.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
   gl.uniform1f(ldy.uPhase, phase);
+  gl.uniform1f(ldy.uBootstrap, liqBootstrap);
   bindSweepUniforms(ldy, period);
-  gl.uniform1i(ldy.uProg, pp.prog);
-  gl.uniform2f(ldy.uLightPos, pp.lightPos[0], pp.lightPos[1]);
-  gl.uniform1f(ldy.uLightAmt, pp.lightAmt);
   gl.uniform3fv(ldy.uColTextA, easeColor('txa', ui('colTextA').value, k));
   gl.uniform3fv(ldy.uColTextM, easeColor('txm', ui('colTextM').value, k));
   gl.uniform3fv(ldy.uColTextB, easeColor('txb', ui('colTextB').value, k));
@@ -1817,16 +1834,11 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(lc.uTime, off.grainT);
   gl.uniform2f(lc.uBgOff, off.bg[0], off.bg[1]);
   gl.uniform2f(lc.uTextBounds, textBounds[0], textBounds[1]);
-  gl.uniform1f(lc.uCrispAmt, pp.crisp);
   gl.uniform1f(lc.uSeed, state.seed);
   gl.uniform1i(lc.uPreset, +ui('liqPreset').value);
   gl.uniform1f(lc.uGloss, easeVal('lgloss', +ui('liqGloss').value, k));
   gl.uniform1f(lc.uRefract, easeVal('lrefr', +ui('liqRefract').value, k));
-  gl.uniform1f(lc.uPhase, phase);
-  bindSweepUniforms(lc, period);
-  gl.uniform1f(lc.uMaskScale, easeVal('lnoise', +ui('liqNoise').value, k));
-  gl.uniform1f(lc.uDissolveAmt, pp.dissolve);
-  gl.uniform2f(lc.uMaskOff, off.mask[0], off.mask[1]);
+  gl.uniform1f(lc.uTension, easeVal('ltens', +ui('liqTension').value, k));
   gl.uniform3fv(lc.uColRed, easeColor('red', ui('colRed').value, k));
   gl.uniform3fv(lc.uColPinkBg, easeColor('pink', ui('colPinkBg').value, k));
   gl.uniform3fv(lc.uColTextA, easeColor('txa', ui('colTextA').value, k));
