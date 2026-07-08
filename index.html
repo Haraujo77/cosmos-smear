@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cosmos Smear — dissolving type</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400..800&family=Fredoka:wght@300..700&family=Nunito:wght@200..1000&family=Quicksand:wght@300..700&family=Varela+Round&family=Inter:wght@100..900&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    background: #101014;
+    color: #e8e8ee;
+    font-family: 'Inter', system-ui, sans-serif;
+    display: flex;
+    align-items: stretch;
+    overflow: hidden;
+  }
+  #stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    min-width: 0;
+  }
+  canvas#gl {
+    cursor: crosshair;
+    touch-action: none;
+    max-width: 100%;
+    max-height: calc(100vh - 48px);
+    aspect-ratio: 4 / 5;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+  }
+  #panel {
+    width: 300px;
+    flex-shrink: 0;
+    height: 100vh;
+    box-sizing: border-box;
+    background: #17171d;
+    border-left: 1px solid #26262e;
+    padding: 20px 18px 40px;
+    overflow-y: auto;
+    font-size: 13px;
+  }
+  #panel h1 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin: 0 0 18px;
+    color: #9a9ab0;
+  }
+  .group { margin-bottom: 22px; }
+  .group > .gtitle {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #6d6d82;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  label.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 9px;
+  }
+  label.row > span.lbl { flex-shrink: 0; width: 92px; color: #b9b9c9; }
+  label.row output { width: 38px; text-align: right; color: #8a8a9e; font-variant-numeric: tabular-nums; }
+  input[type="range"] { flex: 1; accent-color: #ff4fa3; min-width: 0; }
+  input[type="text"], select {
+    flex: 1;
+    background: #101016;
+    border: 1px solid #2c2c36;
+    color: #eee;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: inherit;
+    min-width: 0;
+  }
+  input[type="text"]#textInput { font-size: 18px; font-weight: 700; }
+  input[type="color"] {
+    width: 34px; height: 26px;
+    border: 1px solid #2c2c36;
+    border-radius: 6px;
+    background: none;
+    padding: 1px;
+    cursor: pointer;
+  }
+  .btns { display: flex; gap: 8px; }
+  label.check { display: flex; align-items: center; gap: 8px; color: #b9b9c9; margin-bottom: 9px; cursor: pointer; }
+  input[type="checkbox"] { accent-color: #ff4fa3; width: 15px; height: 15px; }
+  .hint { color: #6d6d82; font-size: 11px; margin-top: 8px; line-height: 1.5; }
+  button {
+    flex: 1;
+    background: #26262e;
+    color: #e8e8ee;
+    border: 1px solid #34343e;
+    border-radius: 8px;
+    padding: 9px 0;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #30303a; }
+  button.primary { background: #ff2d55; border-color: #ff2d55; color: #fff; }
+  button.primary:hover { background: #ff4468; }
+  #fallbackNote { color:#ff8; font-size:11px; display:none; margin-top:8px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl" width="896" height="1120"></canvas></div>
+
+<aside id="panel">
+  <h1>Cosmos Smear</h1>
+
+  <div class="group">
+    <div class="gtitle">Type</div>
+    <label class="row"><span class="lbl">Text</span>
+      <input type="text" id="textInput" value="$25K" spellcheck="false"></label>
+    <label class="row"><span class="lbl">Font</span>
+      <select id="fontSelect">
+        <option value="Fredoka">Fredoka (rounded)</option>
+        <option value="Baloo 2">Baloo 2</option>
+        <option value="Varela Round">Varela Round</option>
+        <option value="Quicksand">Quicksand</option>
+        <option value="Nunito">Nunito</option>
+        <option value="Arial Rounded MT Bold">Arial Rounded MT Bold</option>
+        <option value="Helvetica Neue">Helvetica Neue</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Futura">Futura</option>
+        <option value="Impact">Impact</option>
+        <option value="__custom" selected>Custom…</option>
+      </select></label>
+    <label class="row" id="customFontRow"><span class="lbl">Custom font</span>
+      <input type="text" id="customFont" value="RH Phonic" placeholder="Any installed font"></label>
+    <label class="row"><span class="lbl">Weight</span>
+      <input type="range" id="fontWeight" min="300" max="900" step="100" value="400">
+      <output id="fontWeightOut">400</output></label>
+    <label class="row"><span class="lbl">Size</span>
+      <input type="range" id="fontSize" min="20" max="100" step="1" value="70">
+      <output id="fontSizeOut">70%</output></label>
+    <label class="row"><span class="lbl">Letter space</span>
+      <input type="range" id="letterSpace" min="-10" max="40" step="1" value="-5">
+      <output id="letterSpaceOut">-5%</output></label>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">Colors</div>
+    <label class="row"><span class="lbl">Background A</span><input type="color" id="colRed" value="#000000"></label>
+    <label class="row"><span class="lbl">Background B</span><input type="color" id="colPinkBg" value="#000000"></label>
+    <label class="row"><span class="lbl">Text top</span><input type="color" id="colTextA" value="#f9f9f9"></label>
+    <label class="row"><span class="lbl">Text mid</span><input type="color" id="colTextM" value="#ccff00"></label>
+    <label class="row"><span class="lbl">Text bottom</span><input type="color" id="colTextB" value="#00c805"></label>
+    <label class="row"><span class="lbl">Glow</span><input type="color" id="colGlow" value="#f9f9f9"></label>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">Animation</div>
+    <label class="row"><span class="lbl">Program</span>
+      <select id="progSelect">
+        <option value="0" selected>Manual</option>
+        <option value="1">Radial sweep</option>
+        <option value="2">Reveal</option>
+        <option value="3">Orbit light</option>
+      </select></label>
+    <div class="hint" style="margin:0 0 10px">Programs choreograph one full cycle over the loop Period.</div>
+    <label class="check"><input type="checkbox" id="slideChk"> Slide letters</label>
+    <label class="row slideOpt" style="display:none"><span class="lbl">Slide distance</span>
+      <input type="range" id="slideDist" min="50" max="600" step="10" value="200">
+      <output id="slideDistOut">200px</output></label>
+    <label class="row slideOpt" style="display:none"><span class="lbl">Slide time</span>
+      <input type="range" id="slideDur" min="0.2" max="3" step="0.1" value="1">
+      <output id="slideDurOut">1.0s</output></label>
+    <label class="row"><span class="lbl">Dissolve speed</span>
+      <input type="range" id="maskSpeed" min="0" max="3" step="0.05" value="1">
+      <output id="maskSpeedOut">1.0</output></label>
+    <label class="row"><span class="lbl">Dissolve scale</span>
+      <input type="range" id="maskScale" min="0.5" max="5" step="0.1" value="1.8">
+      <output id="maskScaleOut">1.8</output></label>
+    <label class="row"><span class="lbl">Flow mode</span>
+      <select id="flowMode">
+        <option value="0" selected>Noise (organic)</option>
+        <option value="1">Radial out</option>
+        <option value="2">Radial in</option>
+        <option value="3">Vortex</option>
+        <option value="4">Wind</option>
+        <option value="5">Mouse paint</option>
+      </select></label>
+    <label class="row" id="windRow" style="display:none"><span class="lbl">Direction</span>
+      <input type="range" id="flowAngle" min="0" max="360" step="5" value="90">
+      <output id="flowAngleOut">90&deg;</output></label>
+    <label class="row" id="turbRow" style="display:none"><span class="lbl">Turbulence</span>
+      <input type="range" id="turb" min="0" max="2" step="0.05" value="0.35">
+      <output id="turbOut">0.35</output></label>
+    <label class="row"><span class="lbl">Flow speed</span>
+      <input type="range" id="flowSpeed" min="0" max="8" step="0.1" value="2.6">
+      <output id="flowSpeedOut">2.6</output></label>
+    <label class="row"><span class="lbl">Smear length</span>
+      <input type="range" id="smear" min="0.85" max="0.998" step="0.001" value="0.965">
+      <output id="smearOut">0.97</output></label>
+    <label class="row"><span class="lbl">Softness</span>
+      <input type="range" id="softness" min="0" max="3" step="0.05" value="1.2">
+      <output id="softnessOut">1.2</output></label>
+    <div class="btns" style="margin-top:12px">
+      <button id="playBtn">Pause</button>
+      <button id="seedBtn">Re-seed</button>
+      <button id="clearBtn">Clear trails</button>
+    </div>
+    <div id="fallbackNote">Float framebuffers unavailable — using 8-bit fallback.</div>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">Loop &amp; Export</div>
+    <label class="check"><input type="checkbox" id="loopChk" checked> Seamless loop</label>
+    <label class="row"><span class="lbl">Period</span>
+      <input type="range" id="period" min="4" max="20" step="1" value="10">
+      <output id="periodOut">10s</output></label>
+    <div class="btns"><button class="primary" id="exportBtn">Export video</button></div>
+    <div class="hint">Exports exactly one loop period, after a full warm-up cycle, so the file loops seamlessly. MP4 on Chromium, WebM elsewhere.</div>
+  </div>
+</aside>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------- GL setup
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+if (!gl) { document.body.innerHTML = '<p style="padding:40px">WebGL2 not supported.</p>'; throw new Error('no webgl2'); }
+
+const hasFloat = !!gl.getExtension('EXT_color_buffer_float');
+if (!hasFloat) document.getElementById('fallbackNote').style.display = 'block';
+const hasLinearFloat = !!gl.getExtension('OES_texture_float_linear');
+
+const W = canvas.width, H = canvas.height;
+
+const VERT = `#version 300 es
+void main() {
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const NOISE = `
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i), b = hash(i + vec2(1, 0));
+  float c = hash(i + vec2(0, 1)), d = hash(i + vec2(1, 1));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * vnoise(p); p = p * 2.03 + 17.7; a *= 0.5; }
+  return v;
+}
+vec2 curl(vec2 p) {
+  float e = 0.12;
+  float nx1 = fbm(p + vec2(0.0, e)), nx2 = fbm(p - vec2(0.0, e));
+  float ny1 = fbm(p + vec2(e, 0.0)), ny2 = fbm(p - vec2(e, 0.0));
+  return vec2(nx1 - nx2, ny2 - ny1) / (2.0 * e);
+}`;
+
+// Feedback pass: r = trail energy, g = wide bloom, b = dissolve mask
+const FEEDBACK = `#version 300 es
+precision highp float;
+uniform sampler2D uPrev;
+uniform sampler2D uText;
+uniform vec2 uRes;
+uniform float uDecay;
+uniform float uFlow;
+uniform float uMaskScale;
+uniform float uSoft;
+uniform float uSeed;
+uniform float uEps;
+uniform int uFlowMode;
+uniform float uFlowAngle;
+uniform float uTurb;
+uniform vec2 uFlowOff;
+uniform vec2 uMaskOff;
+uniform vec2 uMouse;
+uniform vec2 uMouseVel;
+uniform float uMouseAmt;
+uniform int uProg;
+uniform float uPhase;
+uniform float uInject;
+uniform float uDissolveAmt;
+uniform vec2 uLightPos;
+uniform float uLightAmt;
+out vec4 outColor;
+${NOISE}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 p = uv * asp + uSeed;
+
+  vec2 noiseFl = curl(p * 2.1 + uFlowOff);
+
+  // centered, aspect-corrected coords for the structured fields
+  vec2 c = (uv - 0.5) * asp;
+  float r = max(length(c), 1e-4);
+  vec2 rn = c / r;
+
+  vec2 fl;
+  if (uFlowMode == 1)      fl = rn;                                  // radial out
+  else if (uFlowMode == 2) fl = -rn;                                 // radial in
+  else if (uFlowMode == 3) fl = vec2(-rn.y, rn.x) * (0.35 + r * 1.5); // vortex
+  else if (uFlowMode == 4) fl = vec2(cos(uFlowAngle), sin(uFlowAngle)); // wind
+  else if (uFlowMode == 5) fl = vec2(0.0);                           // mouse paint
+  else                     fl = noiseFl;                             // organic noise
+
+  // blend organic wobble back on top of the structured fields
+  if (uFlowMode != 0) fl += noiseFl * uTurb;
+
+  float m = fbm(p * uMaskScale + uMaskOff);
+  float mask = smoothstep(0.42, 0.58, m);
+
+  // program-level dissolve amount (0 = fully crisp, >1 = force full melt)
+  mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
+
+  if (uProg == 1) {
+    // sweep front melts the type left-to-right, holds, then heals
+    float d;
+    float ph = uPhase;
+    if (ph < 0.40)      { float e = mix(-0.15, 1.15, ph / 0.40);          d = 1.0 - smoothstep(e - 0.10, e + 0.10, uv.x); }
+    else if (ph < 0.55) { d = 1.0; }
+    else if (ph < 0.95) { float e = mix(-0.15, 1.15, (ph - 0.55) / 0.40); d = smoothstep(e - 0.10, e + 0.10, uv.x); }
+    else                { d = 0.0; }
+    mask = mix(1.0, mask * 0.2, d);
+  }
+
+  if (uProg == 3) {
+    // orbiting light melts the type near it and pushes trails outward,
+    // like rays emanating from a moving source
+    vec2 ld = (uv - uLightPos) * asp;
+    float linf = exp(-dot(ld, ld) * 42.0) * uLightAmt;
+    fl += (ld / max(length(ld), 1e-3)) * linf * 2.2;
+    mask = mix(mask, 0.0, linf * 0.92);
+  }
+
+  if (uFlowMode == 5) {
+    vec2 md = (uv - uMouse) * asp;
+    float minf = exp(-dot(md, md) * 55.0);
+    vec2 mv = uMouseVel;
+    float ml = length(mv);
+    if (ml > 8.0) mv *= 8.0 / ml;
+    fl += mv * minf * 3.0;
+    // the cursor melts the type where it rubs
+    mask *= 1.0 - minf * uMouseAmt;
+  }
+
+  vec2 disp = fl * uFlow / uRes.y;
+
+  vec2 uv2 = uv - disp;
+  vec2 px = (1.0 + uSoft) / uRes;
+
+  float trail = 0.0, wsum = 0.0;
+  for (int i = -1; i <= 1; i++)
+  for (int j = -1; j <= 1; j++) {
+    float w = (i == 0 && j == 0) ? 2.0 : 1.0;
+    trail += w * texture(uPrev, uv2 + vec2(i, j) * px).r;
+    wsum += w;
+  }
+  trail = trail / wsum * uDecay - uEps;
+
+  float bloom = 0.0;
+  vec2 bpx = px * 5.0;
+  for (int i = -1; i <= 1; i++)
+  for (int j = -1; j <= 1; j++) {
+    bloom += texture(uPrev, uv2 + vec2(i, j) * bpx).g;
+  }
+  bloom = bloom / 9.0 * (uDecay - 0.015) - uEps;
+
+  float txt = texture(uText, uv).a;
+  float dissolving = txt * (1.0 - mask) * uInject;
+
+  trail = clamp(max(dissolving, trail), 0.0, 1.0);
+  bloom = clamp(max(dissolving * 0.55, bloom), 0.0, 1.0);
+
+  outColor = vec4(trail, bloom, mask, 1.0);
+}`;
+
+const COMPOSITE = `#version 300 es
+precision highp float;
+uniform sampler2D uFeed;
+uniform sampler2D uText;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec2 uBgOff;
+uniform vec2 uTextBounds;
+uniform float uCrispAmt;
+uniform int uProg;
+uniform vec2 uLightPos;
+uniform float uLightAmt;
+uniform float uSeed;
+uniform vec3 uColRed;
+uniform vec3 uColPinkBg;
+uniform vec3 uColTextA;
+uniform vec3 uColTextM;
+uniform vec3 uColTextB;
+uniform vec3 uColGlow;
+out vec4 outColor;
+${NOISE}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 p = uv * asp + uSeed;
+
+  vec4 f = texture(uFeed, uv);
+  float trail = f.r, bloom = f.g, mask = f.b;
+  float txt = texture(uText, uv).a;
+
+  // drifting two-tone background
+  float g1 = fbm(p * 1.15 + uBgOff + 3.1);
+  vec3 bg = mix(uColRed, uColPinkBg, smoothstep(0.42, 0.88, g1));
+
+  // three-stop vertical gradient spanning exactly the rendered text
+  float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
+  vec3 textCol = mix(
+    mix(uColTextB, uColTextM, smoothstep(0.0, 0.55, gy)),
+    uColTextA,
+    smoothstep(0.55, 1.0, gy));
+
+  // bloom bleeds the text color softly into the background
+  bg = mix(bg, textCol, clamp(bloom * 1.1, 0.0, 1.0) * 0.5);
+
+  // smear trails: ramp through the text color first, then to the hot
+  // glow core, so there is no dark seam between glow and type
+  float body = smoothstep(0.015, 0.45, trail);
+  float hot  = smoothstep(0.45, 0.95, trail);
+  vec3 col = mix(bg, textCol, body);
+  col = mix(col, uColGlow, hot);
+
+  // crisp text on top where mask allows
+  float crisp = txt * mask * uCrispAmt;
+  col = mix(col, textCol, crisp * (1.0 - hot));
+
+  // subtle grain
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.012;
+  outColor = vec4(col, 1.0);
+}`;
+
+function compile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(sh));
+  return sh;
+}
+function program(fragSrc) {
+  const pr = gl.createProgram();
+  gl.attachShader(pr, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS))
+    throw new Error(gl.getProgramInfoLog(pr));
+  const uniforms = {};
+  const n = gl.getProgramParameter(pr, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const info = gl.getActiveUniform(pr, i);
+    uniforms[info.name] = gl.getUniformLocation(pr, info.name);
+  }
+  return { pr, u: uniforms };
+}
+
+const feedbackProg = program(FEEDBACK);
+const compositeProg = program(COMPOSITE);
+
+// ping-pong render targets
+function makeTarget() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  const filter = (hasFloat && !hasLinearFloat) ? gl.NEAREST : gl.LINEAR;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (hasFloat)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  else
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fbo };
+}
+let targets = [makeTarget(), makeTarget()];
+let cur = 0;
+
+function clearTargets() {
+  for (const t of targets) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+clearTargets();
+
+// ---------------------------------------------------------------- text texture
+const textCanvas = document.createElement('canvas');
+textCanvas.width = W; textCanvas.height = H;
+const tctx = textCanvas.getContext('2d');
+const textTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, textTex);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+const ui = id => document.getElementById(id);
+const textBounds = [0.2, 0.8]; // uv-space bottom/top of the rendered text
+
+function currentFontFamily() {
+  const sel = ui('fontSelect').value;
+  return sel === '__custom' ? (ui('customFont').value || 'sans-serif') : sel;
+}
+
+// measure at a 100px reference to find the largest size that fits the
+// canvas with padding; the Size slider is then a % of that maximum, so
+// it always has an effect regardless of text length
+function textLayout() {
+  const text = ui('textInput').value || ' ';
+  const family = currentFontFamily();
+  const weight = ui('fontWeight').value;
+  const sizePct = +ui('fontSize').value / 100;
+  const lsPct = +ui('letterSpace').value / 100; // letter spacing as % of em
+
+  tctx.font = `${weight} 100px "${family}", sans-serif`;
+  tctx.letterSpacing = `${100 * lsPct}px`;
+  const w100 = Math.max(tctx.measureText(text).width, 1);
+  const size = Math.min((W * 0.80) / w100 * 100, H * 0.80) * sizePct;
+  return { text, size, font: `${weight} ${size}px "${family}", sans-serif`, ls: size * lsPct };
+}
+
+function uploadTextTexture() {
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+}
+
+function redrawText() {
+  const L = textLayout();
+  tctx.clearRect(0, 0, W, H);
+  tctx.fillStyle = '#fff';
+  tctx.textAlign = 'center';
+  tctx.textBaseline = 'middle';
+  tctx.font = L.font;
+  tctx.letterSpacing = `${L.ls}px`;
+  tctx.fillText(L.text, W / 2, H / 2);
+
+  // measure the real glyph bounds so the gradient can span exactly the
+  // rendered text, no matter how much auto-fit shrinks it
+  const m2 = tctx.measureText(L.text);
+  const topPx = H / 2 - (m2.actualBoundingBoxAscent || L.size * 0.5);
+  const botPx = H / 2 + (m2.actualBoundingBoxDescent || L.size * 0.5);
+  // convert to GL uv space (y up): x = bottom edge, y = top edge
+  textBounds[0] = 1 - botPx / H;
+  textBounds[1] = 1 - topPx / H;
+
+  uploadTextTexture();
+}
+
+// Slide program: letters slide up from below to appear, then continue up
+// and out to disappear, staggered one by one.
+function drawSlideFrame(phase) {
+  const L = textLayout();
+  tctx.clearRect(0, 0, W, H);
+  tctx.fillStyle = '#fff';
+  tctx.textAlign = 'left';
+  tctx.textBaseline = 'middle';
+  tctx.font = L.font;
+  tctx.letterSpacing = `${L.ls}px`;
+
+  const total = tctx.measureText(L.text).width;
+  const startX = (W - total) / 2;
+  const n = L.text.length;
+  // stagger halved so each letter starts well before the previous lands
+  const dur = Math.min(+ui('slideDur').value / +ui('period').value, 0.3);
+  const stagger = Math.min(dur * 0.14, 0.055 / Math.max(n - 1, 1));
+  const slidePx = +ui('slideDist').value;
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeIn = t => t * t * t;
+  const cl = t => Math.min(Math.max(t, 0), 1);
+
+  for (let i = 0; i < n; i++) {
+    const x = startX + (i === 0 ? 0 : tctx.measureText(L.text.slice(0, i)).width);
+    const qIn = cl((phase - (0.05 + i * stagger)) / dur);
+    const qOut = cl((phase - (0.60 + i * stagger)) / dur);
+    let dy, alpha;
+    if (qOut > 0) { dy = -slidePx * easeIn(qOut); alpha = 1 - easeIn(qOut); }
+    else          { dy = slidePx * (1 - easeOut(qIn)); alpha = easeOut(qIn); }
+    if (alpha > 0.002) {
+      tctx.globalAlpha = alpha;
+      tctx.fillText(L.text[i], x, H / 2 + dy);
+    }
+  }
+  tctx.globalAlpha = 1;
+  uploadTextTexture();
+}
+
+// ---------------------------------------------------------------- params & UI
+function hexToRgb(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+}
+
+const state = { playing: true, seed: Math.random() * 100 };
+
+const sliders = [
+  ['maskSpeed', v => v.toFixed(1)],
+  ['maskScale', v => v.toFixed(1)],
+  ['flowSpeed', v => v.toFixed(1)],
+  ['smear', v => v.toFixed(2)],
+  ['softness', v => v.toFixed(1)],
+  ['fontWeight', v => v.toFixed(0)],
+  ['fontSize', v => v.toFixed(0) + '%'],
+  ['letterSpace', v => v.toFixed(0) + '%'],
+  ['flowAngle', v => v.toFixed(0) + '\u00b0'],
+  ['turb', v => v.toFixed(2)],
+  ['period', v => v.toFixed(0) + 's'],
+  ['slideDist', v => v.toFixed(0) + 'px'],
+  ['slideDur', v => v.toFixed(1) + 's'],
+];
+for (const [id, fmt] of sliders) {
+  const el = ui(id), out = ui(id + 'Out');
+  const update = () => { out.textContent = fmt(+el.value); };
+  el.addEventListener('input', update);
+  update();
+}
+
+for (const id of ['textInput', 'fontWeight', 'fontSize', 'letterSpace'])
+  ui(id).addEventListener('input', redrawText);
+ui('fontSelect').addEventListener('change', () => {
+  ui('customFontRow').style.display = ui('fontSelect').value === '__custom' ? '' : 'none';
+  redrawText();
+});
+ui('customFont').addEventListener('input', redrawText);
+
+ui('playBtn').addEventListener('click', () => {
+  state.playing = !state.playing;
+  ui('playBtn').textContent = state.playing ? 'Pause' : 'Play';
+});
+ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearTargets(); });
+ui('clearBtn').addEventListener('click', clearTargets);
+
+ui('slideChk').addEventListener('change', () => {
+  const on = ui('slideChk').checked;
+  document.querySelectorAll('.slideOpt').forEach(el => { el.style.display = on ? '' : 'none'; });
+  if (!on) redrawText();
+});
+
+ui('flowMode').addEventListener('change', () => {
+  const structured = ui('flowMode').value !== '0';
+  ui('turbRow').style.display = structured ? '' : 'none';
+  ui('windRow').style.display = ui('flowMode').value === '4' ? '' : 'none';
+});
+
+// ---------------------------------------------------------------- mouse paint
+const mouse = { x: 0.5, y: 0.5, vx: 0, vy: 0, down: false, lastX: 0, lastY: 0, lastT: 0 };
+function mouseUV(e) {
+  const r = canvas.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height];
+}
+canvas.addEventListener('pointerdown', e => {
+  const [x, y] = mouseUV(e);
+  mouse.down = true;
+  mouse.x = mouse.lastX = x;
+  mouse.y = mouse.lastY = y;
+  mouse.lastT = performance.now();
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!mouse.down) return;
+  const [x, y] = mouseUV(e);
+  const now = performance.now();
+  const mdt = Math.max((now - mouse.lastT) / 1000, 1e-3);
+  // smoothed velocity in uv/s
+  mouse.vx += ((x - mouse.lastX) / mdt - mouse.vx) * 0.35;
+  mouse.vy += ((y - mouse.lastY) / mdt - mouse.vy) * 0.35;
+  mouse.x = x; mouse.y = y;
+  mouse.lastX = x; mouse.lastY = y;
+  mouse.lastT = now;
+});
+const endStroke = () => { mouse.down = false; };
+canvas.addEventListener('pointerup', endStroke);
+canvas.addEventListener('pointercancel', endStroke);
+
+// ---------------------------------------------------------------- loopable time
+// In loop mode every drifting noise offset travels on a circle that
+// closes after exactly one period, so the whole animation is periodic.
+function driftOffsets(t) {
+  const maskSpeed = +ui('maskSpeed').value;
+  if (!ui('loopChk').checked) {
+    return {
+      flow: [t * 0.07, -t * 0.05],
+      mask: [t * 0.11 * maskSpeed, t * 0.083 * maskSpeed],
+      bg:   [t * 0.045, -t * 0.03],
+      grainT: t,
+    };
+  }
+  const T = +ui('period').value;
+  const th = 2 * Math.PI * ((t % T) / T);
+  const cs = Math.cos(th), sn = Math.sin(th);
+  const R = T / (2 * Math.PI); // radius that preserves apparent speed
+  return {
+    flow: [0.086 * R * cs, 0.086 * R * sn],
+    mask: [0.138 * maskSpeed * R * cs, 0.138 * maskSpeed * R * sn],
+    bg:   [0.054 * R * cs, 0.054 * R * sn],
+    grainT: t % T,
+  };
+}
+
+// smoothly ease every color/param toward its UI value so
+// changes crossfade instead of snapping
+const eased = {};
+function easeVal(key, target, k) {
+  if (!(key in eased)) eased[key] = target;
+  eased[key] += (target - eased[key]) * k;
+  return eased[key];
+}
+function easeColor(key, hex, k) {
+  const t = hexToRgb(hex);
+  return [easeVal(key + 'r', t[0], k), easeVal(key + 'g', t[1], k), easeVal(key + 'b', t[2], k)];
+}
+
+// ---------------------------------------------------------------- programs
+// Each program choreographs one full cycle over the loop Period by
+// driving injection, crispness, dissolve amount and the light orbit.
+function programParams(phase) {
+  const prog = +ui('progSelect').value;
+  const p = {
+    prog,
+    inject: 1, crisp: 1, dissolve: 1,
+    lightPos: [0.5, 0.5], lightAmt: 0,
+    flowMode: +ui('flowMode').value,
+  };
+  const ss = (a, b, x) => {
+    const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+    return t * t * (3 - 2 * t);
+  };
+  if (prog === 1) {
+    p.flowMode = 1; // radial out drives the sweep's smears
+  } else if (prog === 2) {
+    // empty -> patchy crystallize out of smear -> clean -> patchy melt -> empty
+    // (the appear is the exact mirror of the melt: crisp stays on and the
+    // noise dissolve ramps, so letters emerge piece by piece from the smear)
+    p.inject = ss(0.04, 0.12, phase) - ss(0.86, 0.96, phase);
+    p.dissolve = 1.6 * (1 - ss(0.14, 0.44, phase) + ss(0.58, 0.80, phase));
+    p.crisp = ss(0.06, 0.12, phase) - ss(0.80, 0.90, phase);
+  } else if (prog === 3) {
+    const a = 2 * Math.PI * phase;
+    p.lightPos = [0.5 + 0.26 * Math.cos(a) / (W / H), 0.5 + 0.26 * Math.sin(a)];
+    p.lightAmt = 1;
+    p.dissolve = 0.15; // keep the type mostly solid; the light does the melting
+  }
+  return p;
+}
+
+// ---------------------------------------------------------------- render loop
+let time = 0;
+let lastT = performance.now();
+
+function renderFrame(dt) {
+  time += dt;
+  const k = Math.min(1, dt * 2.2);
+  const off = driftOffsets(time);
+  const period = +ui('period').value;
+  const phase = ((time % period) + period) % period / period;
+  const pp = programParams(phase);
+  if (ui('slideChk').checked) drawSlideFrame(phase);
+
+  // decay the paint-stroke velocity so releases fade out
+  const vDecay = Math.exp(-dt * 5);
+  mouse.vx *= vDecay;
+  mouse.vy *= vDecay;
+  const mouseAmt = easeVal('mamt', mouse.down ? 1 : 0, Math.min(1, dt * 8));
+
+  gl.viewport(0, 0, W, H);
+
+  // feedback pass
+  const src = targets[cur], dst = targets[1 - cur];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.useProgram(feedbackProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, src.tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  const fu = feedbackProg.u;
+  gl.uniform1i(fu.uPrev, 0);
+  gl.uniform1i(fu.uText, 1);
+  gl.uniform2f(fu.uRes, W, H);
+  // normalize decay/advection to a 60fps reference so the look is the
+  // same on 120Hz displays or throttled tabs
+  const fscale = Math.min(Math.max(dt * 60, 0.25), 6);
+  gl.uniform1f(fu.uDecay, Math.pow(+ui('smear').value, fscale));
+  gl.uniform1f(fu.uFlow, easeVal('flow', +ui('flowSpeed').value, k) * Math.min(fscale, 2.5));
+  gl.uniform1f(fu.uMaskScale, easeVal('mscale', +ui('maskScale').value, k));
+  gl.uniform1f(fu.uSoft, +ui('softness').value);
+  gl.uniform1i(fu.uFlowMode, pp.flowMode);
+  gl.uniform1f(fu.uFlowAngle, +ui('flowAngle').value * Math.PI / 180);
+  gl.uniform1f(fu.uTurb, easeVal('turb', +ui('turb').value, k));
+  gl.uniform2f(fu.uFlowOff, off.flow[0], off.flow[1]);
+  gl.uniform2f(fu.uMaskOff, off.mask[0], off.mask[1]);
+  gl.uniform2f(fu.uMouse, mouse.x, mouse.y);
+  gl.uniform2f(fu.uMouseVel, mouse.vx, mouse.vy);
+  gl.uniform1f(fu.uMouseAmt, mouseAmt);
+  gl.uniform1i(fu.uProg, pp.prog);
+  gl.uniform1f(fu.uPhase, phase);
+  gl.uniform1f(fu.uInject, pp.inject);
+  gl.uniform1f(fu.uDissolveAmt, pp.dissolve);
+  gl.uniform2f(fu.uLightPos, pp.lightPos[0], pp.lightPos[1]);
+  gl.uniform1f(fu.uLightAmt, pp.lightAmt);
+  gl.uniform1f(fu.uSeed, state.seed);
+  gl.uniform1f(fu.uEps, hasFloat ? 0.0 : 0.004);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  cur = 1 - cur;
+
+  // composite pass
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.useProgram(compositeProg.pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, targets[cur].tex);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  const cu = compositeProg.u;
+  gl.uniform1i(cu.uFeed, 0);
+  gl.uniform1i(cu.uText, 1);
+  gl.uniform2f(cu.uRes, W, H);
+  gl.uniform1f(cu.uTime, off.grainT);
+  gl.uniform2f(cu.uBgOff, off.bg[0], off.bg[1]);
+  gl.uniform2f(cu.uTextBounds, textBounds[0], textBounds[1]);
+  gl.uniform1f(cu.uCrispAmt, pp.crisp);
+  gl.uniform1i(cu.uProg, pp.prog);
+  gl.uniform2f(cu.uLightPos, pp.lightPos[0], pp.lightPos[1]);
+  gl.uniform1f(cu.uLightAmt, pp.lightAmt);
+  gl.uniform1f(cu.uSeed, state.seed);
+  gl.uniform3fv(cu.uColRed, easeColor('red', ui('colRed').value, k));
+  gl.uniform3fv(cu.uColPinkBg, easeColor('pink', ui('colPinkBg').value, k));
+  gl.uniform3fv(cu.uColTextA, easeColor('txa', ui('colTextA').value, k));
+  gl.uniform3fv(cu.uColTextM, easeColor('txm', ui('colTextM').value, k));
+  gl.uniform3fv(cu.uColTextB, easeColor('txb', ui('colTextB').value, k));
+  gl.uniform3fv(cu.uColGlow, easeColor('glow', ui('colGlow').value, k));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  if (!state.playing || state.exporting) return;
+  renderFrame(dt);
+}
+
+// ---------------------------------------------------------------- export
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+async function exportVideo() {
+  if (state.exporting) return;
+  const btn = ui('exportBtn');
+  const fps = 60;
+  const T = +ui('period').value;
+  const frames = Math.round(T * fps);
+  state.exporting = true;
+  btn.disabled = true;
+  try {
+    if ('VideoEncoder' in window) {
+      const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/+esm');
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: { codec: 'avc', width: W, height: H },
+        fastStart: 'in-memory',
+      });
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: e => console.error('encoder', e),
+      });
+      encoder.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 10_000_000, framerate: fps });
+
+      // warm-up: one full period settles the feedback trails into their
+      // periodic steady state so the recorded cycle joins end-to-start
+      btn.textContent = 'Warming up\u2026';
+      await new Promise(r => setTimeout(r, 0));
+      for (let f = 0; f < frames; f++) {
+        renderFrame(1 / fps);
+        if (f % 120 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      for (let f = 0; f < frames; f++) {
+        renderFrame(1 / fps);
+        const vf = new VideoFrame(canvas, { timestamp: f * 1e6 / fps, duration: 1e6 / fps });
+        encoder.encode(vf, { keyFrame: f % fps === 0 });
+        vf.close();
+        while (encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 0));
+        if (f % 30 === 0) {
+          btn.textContent = `Exporting ${Math.round(f / frames * 100)}%`;
+          await new Promise(r => setTimeout(r, 0));
+        }
+      }
+      btn.textContent = 'Finalizing\u2026';
+      await encoder.flush();
+      muxer.finalize();
+      download(new Blob([muxer.target.buffer], { type: 'video/mp4' }), `cosmos-smear-${T}s-loop.mp4`);
+    } else {
+      // realtime WebM fallback: wait one period to settle, then record one
+      btn.textContent = 'Warming up\u2026';
+      state.exporting = false; // let the live loop run
+      await new Promise(r => setTimeout(r, T * 1000));
+      const stream = canvas.captureStream(fps);
+      const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 10_000_000 });
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      const done = new Promise(r => { rec.onstop = r; });
+      btn.textContent = 'Recording\u2026';
+      rec.start();
+      await new Promise(r => setTimeout(r, T * 1000));
+      rec.stop();
+      await done;
+      download(new Blob(chunks, { type: 'video/webm' }), `cosmos-smear-${T}s-loop.webm`);
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Export failed: ' + e.message);
+  } finally {
+    state.exporting = false;
+    btn.disabled = false;
+    btn.textContent = 'Export video';
+  }
+}
+ui('exportBtn').addEventListener('click', exportVideo);
+
+redrawText();
+document.fonts.ready.then(redrawText);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
