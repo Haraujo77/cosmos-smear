@@ -167,11 +167,29 @@
     <label class="row"><span class="lbl">Program</span>
       <select id="progSelect">
         <option value="0" selected>Manual</option>
-        <option value="1">Radial sweep</option>
-        <option value="2">Reveal</option>
-        <option value="3">Orbit light</option>
+        <option value="1">Reveal</option>
+        <option value="2">Orbit light</option>
       </select></label>
     <div class="hint" style="margin:0 0 10px">Programs choreograph one full cycle over the loop Period.</div>
+    <label class="check"><input type="checkbox" id="sweepChk" checked> Sweep dissolve</label>
+    <label class="row sweepOpt" style="display:none"><span class="lbl">Sweep mode</span>
+      <select id="sweepMode">
+        <option value="0">Wave</option>
+        <option value="1">Cascade</option>
+        <option value="2" selected>Rolling</option>
+      </select></label>
+    <label class="row sweepOpt" style="display:none"><span class="lbl">Melt in</span>
+      <input type="range" id="sweepIn" min="0.2" max="15" step="0.1" value="6">
+      <output id="sweepInOut">6.0s</output></label>
+    <label class="row sweepOpt sweepWaveOpt" style="display:none"><span class="lbl">Hold</span>
+      <input type="range" id="sweepHold" min="0" max="10" step="0.1" value="1.5">
+      <output id="sweepHoldOut">1.5s</output></label>
+    <label class="row sweepOpt" style="display:none"><span class="lbl">Heal</span>
+      <input type="range" id="sweepOut" min="0.2" max="15" step="0.1" value="6">
+      <output id="sweepOutOut">6.0s</output></label>
+    <label class="row sweepOpt sweepRollingOpt" style="display:none"><span class="lbl">Heal lead</span>
+      <input type="range" id="sweepLead" min="0.1" max="10" step="0.1" value="4.4">
+      <output id="sweepLeadOut">4.4s</output></label>
     <label class="check"><input type="checkbox" id="slideChk"> Slide letters</label>
     <label class="row slideOpt" style="display:none"><span class="lbl">Slide distance</span>
       <input type="range" id="slideDist" min="50" max="600" step="10" value="200">
@@ -187,12 +205,43 @@
       <output id="maskScaleOut">1.8</output></label>
     <label class="row"><span class="lbl">Flow mode</span>
       <select id="flowMode">
-        <option value="0" selected>Noise (organic)</option>
-        <option value="1">Radial out</option>
-        <option value="2">Radial in</option>
-        <option value="3">Vortex</option>
-        <option value="4">Wind</option>
-        <option value="5">Mouse paint</option>
+        <optgroup label="Organic">
+          <option value="0" selected>Noise</option>
+        </optgroup>
+        <optgroup label="Radial">
+          <option value="1">Radial out</option>
+          <option value="2">Radial in</option>
+          <option value="3">Vortex</option>
+          <option value="9">Spiral out</option>
+          <option value="10">Spiral in</option>
+          <option value="11">Pulse</option>
+          <option value="12">Corner burst</option>
+          <option value="21">Shatter</option>
+        </optgroup>
+        <optgroup label="Directional">
+          <option value="4">Wind</option>
+          <option value="6">Rise</option>
+          <option value="7">Sink</option>
+          <option value="8">Shear</option>
+          <option value="22">Echo</option>
+        </optgroup>
+        <optgroup label="Wave">
+          <option value="13">Swell</option>
+          <option value="14">Zigzag</option>
+          <option value="15">Lissajous</option>
+        </optgroup>
+        <optgroup label="Multi-point">
+          <option value="16">Twin vortex</option>
+          <option value="17">Attractor</option>
+          <option value="18">Repulsor</option>
+        </optgroup>
+        <optgroup label="Text-aware">
+          <option value="19">Along stroke</option>
+          <option value="20">Normal push</option>
+        </optgroup>
+        <optgroup label="Interactive">
+          <option value="5">Mouse paint</option>
+        </optgroup>
       </select></label>
     <label class="row" id="windRow" style="display:none"><span class="lbl">Direction</span>
       <input type="range" id="flowAngle" min="0" max="360" step="5" value="90">
@@ -204,8 +253,8 @@
       <input type="range" id="flowSpeed" min="0" max="8" step="0.1" value="2.6">
       <output id="flowSpeedOut">2.6</output></label>
     <label class="row"><span class="lbl">Smear length</span>
-      <input type="range" id="smear" min="0.85" max="0.998" step="0.001" value="0.965">
-      <output id="smearOut">0.97</output></label>
+      <input type="range" id="smear" min="0.85" max="0.998" step="0.001" value="0.96">
+      <output id="smearOut">0.96</output></label>
     <label class="row"><span class="lbl">Softness</span>
       <input type="range" id="softness" min="0" max="3" step="0.05" value="1.2">
       <output id="softnessOut">1.2</output></label>
@@ -293,6 +342,18 @@ uniform vec2 uMaskOff;
 uniform vec2 uMouse;
 uniform vec2 uMouseVel;
 uniform float uMouseAmt;
+uniform float uSweep;
+uniform int uSweepMode;
+uniform float uSweepMeltEnd;
+uniform float uSweepHoldEnd;
+uniform float uSweepHealEnd;
+uniform float uSweepRollHealStart;
+uniform float uSweepRollHealEnd;
+uniform float uSweepBase;
+uniform float uSweepStagger;
+uniform float uSweepHealDur;
+uniform int uLetterCount;
+uniform float uLetterStarts[33];
 uniform int uProg;
 uniform float uPhase;
 uniform float uInject;
@@ -313,16 +374,61 @@ void main() {
   float r = max(length(c), 1e-4);
   vec2 rn = c / r;
 
-  vec2 fl;
-  if (uFlowMode == 1)      fl = rn;                                  // radial out
-  else if (uFlowMode == 2) fl = -rn;                                 // radial in
-  else if (uFlowMode == 3) fl = vec2(-rn.y, rn.x) * (0.35 + r * 1.5); // vortex
-  else if (uFlowMode == 4) fl = vec2(cos(uFlowAngle), sin(uFlowAngle)); // wind
-  else if (uFlowMode == 5) fl = vec2(0.0);                           // mouse paint
-  else                     fl = noiseFl;                             // organic noise
+  vec2 tan = vec2(-rn.y, rn.x);
+  vec2 fl = noiseFl;
+  float TAU = 6.2831853;
 
-  // blend organic wobble back on top of the structured fields
-  if (uFlowMode != 0) fl += noiseFl * uTurb;
+  if (uFlowMode == 1)       fl = rn;
+  else if (uFlowMode == 2)  fl = -rn;
+  else if (uFlowMode == 3)  fl = tan * (0.35 + r * 1.5);
+  else if (uFlowMode == 4)  fl = vec2(cos(uFlowAngle), sin(uFlowAngle));
+  else if (uFlowMode == 5)  fl = vec2(0.0);
+  else if (uFlowMode == 6)  fl = vec2(0.0, 1.0);
+  else if (uFlowMode == 7)  fl = vec2(0.0, -1.0);
+  else if (uFlowMode == 8)  fl = vec2((uv.y - 0.5) * 2.0, 0.0);
+  else if (uFlowMode == 9)  fl = normalize(rn + tan * 0.85);
+  else if (uFlowMode == 10) fl = normalize(-rn + tan * 0.85);
+  else if (uFlowMode == 11) fl = rn * sin(uPhase * TAU);
+  else if (uFlowMode == 12) {
+    vec2 corner = vec2(cos(uFlowAngle), sin(uFlowAngle)) * 0.55 * asp;
+    fl = normalize(c - corner);
+  } else if (uFlowMode == 13) {
+    fl = vec2(sin(uv.y * 8.0 + uPhase * TAU) * 0.75,
+              cos(uv.y * 5.0 + uPhase * TAU * 0.7) * 0.35);
+  } else if (uFlowMode == 14) {
+    fl = vec2(sign(sin(uv.y * 14.0)) * 0.85, 0.0);
+  } else if (uFlowMode == 15) {
+    fl = vec2(sin(uPhase * TAU * 2.0 + uv.y * 4.0),
+              cos(uPhase * TAU * 3.0 + uv.x * 4.0));
+  } else if (uFlowMode == 16) {
+    vec2 d1 = c - vec2(-0.28, 0.0), d2 = c - vec2(0.28, 0.0);
+    vec2 v1 = vec2(-d1.y, d1.x) / max(length(d1), 0.04);
+    vec2 v2 = vec2(d2.y, -d2.x) / max(length(d2), 0.04);
+    fl = normalize(v1 + v2);
+  } else if (uFlowMode == 17 || uFlowMode == 18) {
+    vec2 spot = vec2(0.5 + 0.24 * cos(uPhase * TAU) / asp.x,
+                     0.5 + 0.24 * sin(uPhase * TAU));
+    vec2 to = (spot - uv) * asp;
+    fl = normalize(to + 1e-4) * (uFlowMode == 17 ? 1.0 : -1.0);
+  } else if (uFlowMode == 19 || uFlowMode == 20) {
+    vec2 px = 1.5 / uRes;
+    float l = texture(uText, uv + vec2(-px.x, 0.0)).a;
+    float rgt = texture(uText, uv + vec2( px.x, 0.0)).a;
+    float d = texture(uText, uv + vec2(0.0, -px.y)).a;
+    float u = texture(uText, uv + vec2(0.0,  px.y)).a;
+    vec2 g = vec2(rgt - l, u - d);
+    float gl = length(g);
+    if (gl > 0.002)
+      fl = (uFlowMode == 19) ? vec2(-g.y, g.x) / gl : g / gl;
+  } else if (uFlowMode == 21) {
+    fl = rn * (0.15 + r * 2.8);
+  } else if (uFlowMode == 22) {
+    float s = sign(sin(uPhase * TAU));
+    fl = vec2(cos(uFlowAngle), sin(uFlowAngle)) * s * (0.35 + abs(s) * 0.65);
+  }
+
+  // blend organic wobble back on top of structured fields
+  if (uFlowMode != 0 && uFlowMode != 5) fl += noiseFl * uTurb;
 
   float m = fbm(p * uMaskScale + uMaskOff);
   float mask = smoothstep(0.42, 0.58, m);
@@ -330,18 +436,54 @@ void main() {
   // program-level dissolve amount (0 = fully crisp, >1 = force full melt)
   mask = clamp(mix(1.0, mask, uDissolveAmt), 0.0, 1.0);
 
-  if (uProg == 1) {
-    // sweep front melts the type left-to-right, holds, then heals
-    float d;
+  if (uSweep > 0.5) {
+    float d = 0.0;
     float ph = uPhase;
-    if (ph < 0.40)      { float e = mix(-0.15, 1.15, ph / 0.40);          d = 1.0 - smoothstep(e - 0.10, e + 0.10, uv.x); }
-    else if (ph < 0.55) { d = 1.0; }
-    else if (ph < 0.95) { float e = mix(-0.15, 1.15, (ph - 0.55) / 0.40); d = smoothstep(e - 0.10, e + 0.10, uv.x); }
-    else                { d = 0.0; }
+    if (uSweepMode == 1) {
+      // cascade: each letter melts then heals before the next finishes —
+      // when letter i+1 starts melting, letter i starts healing
+      int letterIdx = uLetterCount - 1;
+      for (int i = 0; i < 31; i++) {
+        if (i >= uLetterCount - 1) break;
+        if (uv.x < uLetterStarts[i + 1]) { letterIdx = i; break; }
+      }
+      float idxf = float(letterIdx);
+      float meltStart = uSweepBase + idxf * uSweepStagger;
+      float healStart = uSweepBase + (idxf + 1.0) * uSweepStagger;
+      if (ph >= meltStart && ph < healStart)
+        d = smoothstep(meltStart, healStart, ph);
+      else if (ph >= healStart && ph < healStart + uSweepHealDur)
+        d = 1.0 - smoothstep(healStart, healStart + uSweepHealDur, ph);
+    } else if (uSweepMode == 2) {
+      // rolling wave: heal front chases melt front — always a crisp band on each side
+      float tM = max(uSweepMeltEnd, 0.001);
+      float tHS = uSweepRollHealStart;
+      float tHE = max(uSweepRollHealEnd, tHS + 0.001);
+      float e_m = ph < tM ? mix(-0.15, 1.15, ph / tM) : 1.15;
+      float e_h = ph < tHS ? -0.15
+        : (ph < tHE ? mix(-0.15, 1.15, (ph - tHS) / (tHE - tHS)) : 1.15);
+      float melted = 1.0 - smoothstep(e_m - 0.10, e_m + 0.10, uv.x);
+      float notHealed = smoothstep(e_h - 0.10, e_h + 0.10, uv.x);
+      d = melted * notHealed;
+    } else {
+      // wave: one front sweeps across the whole word, holds, then heals
+      float t1 = max(uSweepMeltEnd, 0.001);
+      float t2 = max(uSweepHoldEnd, t1 + 0.001);
+      float t3 = max(uSweepHealEnd, t2 + 0.001);
+      if (ph < t1) {
+        float e = mix(-0.15, 1.15, ph / t1);
+        d = 1.0 - smoothstep(e - 0.10, e + 0.10, uv.x);
+      } else if (ph < t2) {
+        d = 1.0;
+      } else if (ph < t3) {
+        float e = mix(-0.15, 1.15, (ph - t2) / (t3 - t2));
+        d = smoothstep(e - 0.10, e + 0.10, uv.x);
+      }
+    }
     mask = mix(1.0, mask * 0.2, d);
   }
 
-  if (uProg == 3) {
+  if (uProg == 2) {
     // orbiting light melts the type near it and pushes trails outward,
     // like rays emanating from a moving source
     vec2 ld = (uv - uLightPos) * asp;
@@ -524,6 +666,24 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 const ui = id => document.getElementById(id);
 const textBounds = [0.2, 0.8]; // uv-space bottom/top of the rendered text
+const MAX_LETTERS = 32;
+let letterCount = 0;
+const letterStarts = new Float32Array(MAX_LETTERS + 1);
+
+function updateLetterBounds(L) {
+  tctx.font = L.font;
+  tctx.letterSpacing = `${L.ls}px`;
+  tctx.textAlign = 'left';
+  tctx.textBaseline = 'middle';
+  const total = tctx.measureText(L.text).width;
+  const startX = (W - total) / 2;
+  letterCount = Math.min(L.text.length, MAX_LETTERS);
+  for (let i = 0; i <= letterCount; i++) {
+    const x = i === 0 ? startX : startX + tctx.measureText(L.text.slice(0, i)).width;
+    letterStarts[i] = x / W;
+  }
+  for (let i = letterCount + 1; i <= MAX_LETTERS; i++) letterStarts[i] = 1.0;
+}
 
 function currentFontFamily() {
   const sel = ui('fontSelect').value;
@@ -573,6 +733,7 @@ function redrawText() {
   textBounds[0] = 1 - botPx / H;
   textBounds[1] = 1 - topPx / H;
 
+  updateLetterBounds(L);
   uploadTextTexture();
 }
 
@@ -636,6 +797,10 @@ const sliders = [
   ['period', v => v.toFixed(0) + 's'],
   ['slideDist', v => v.toFixed(0) + 'px'],
   ['slideDur', v => v.toFixed(1) + 's'],
+  ['sweepIn', v => v.toFixed(1) + 's'],
+  ['sweepHold', v => v.toFixed(1) + 's'],
+  ['sweepOut', v => v.toFixed(1) + 's'],
+  ['sweepLead', v => v.toFixed(1) + 's'],
 ];
 for (const [id, fmt] of sliders) {
   const el = ui(id), out = ui(id + 'Out');
@@ -665,11 +830,63 @@ ui('slideChk').addEventListener('change', () => {
   if (!on) redrawText();
 });
 
-ui('flowMode').addEventListener('change', () => {
-  const structured = ui('flowMode').value !== '0';
+ui('sweepChk').addEventListener('change', updateSweepOpts);
+ui('sweepMode').addEventListener('change', updateSweepOpts);
+
+function updateSweepOpts() {
+  const on = ui('sweepChk').checked;
+  const mode = ui('sweepMode').value;
+  document.querySelectorAll('.sweepOpt').forEach(el => { el.style.display = on ? '' : 'none'; });
+  document.querySelectorAll('.sweepWaveOpt').forEach(el => {
+    el.style.display = on && mode === '0' ? '' : 'none';
+  });
+  document.querySelectorAll('.sweepRollingOpt').forEach(el => {
+    el.style.display = on && mode === '2' ? '' : 'none';
+  });
+}
+
+function sweepPhaseBounds(period) {
+  const inT = +ui('sweepIn').value;
+  const holdT = +ui('sweepHold').value;
+  const outT = +ui('sweepOut').value;
+  const total = Math.max(period, 0.001);
+  const meltEnd = Math.min(inT / total, 0.98);
+  const holdEnd = Math.min((inT + holdT) / total, 0.99);
+  const healEnd = Math.min((inT + holdT + outT) / total, 0.999);
+  return { meltEnd, holdEnd, healEnd };
+}
+
+function rollingPhaseBounds(period) {
+  const inT = +ui('sweepIn').value;
+  const outT = +ui('sweepOut').value;
+  const leadT = Math.min(+ui('sweepLead').value, inT - 0.1);
+  const total = Math.max(period, 0.001);
+  const meltEnd = Math.min(inT / total, 0.98);
+  const healStart = Math.max((inT - leadT) / total, 0.01);
+  const healEnd = Math.min(healStart + outT / total, 0.999);
+  return { meltEnd, healStart, healEnd };
+}
+
+function cascadePhaseParams(period) {
+  const L = textLayout();
+  const n = Math.max(L.text.length, 1);
+  const total = Math.max(period, 0.001);
+  const base = 0.05;
+  const stagger = (+ui('sweepIn').value / total) / Math.max(n - 1, 1);
+  const healDur = +ui('sweepOut').value / total;
+  return { base, stagger, healDur };
+}
+
+ui('flowMode').addEventListener('change', updateFlowOpts);
+updateFlowOpts();
+updateSweepOpts();
+
+function updateFlowOpts() {
+  const mode = ui('flowMode').value;
+  const structured = mode !== '0';
   ui('turbRow').style.display = structured ? '' : 'none';
-  ui('windRow').style.display = ui('flowMode').value === '4' ? '' : 'none';
-});
+  ui('windRow').style.display = ['4', '12', '22'].includes(mode) ? '' : 'none';
+}
 
 // ---------------------------------------------------------------- mouse paint
 const mouse = { x: 0.5, y: 0.5, vx: 0, vy: 0, down: false, lastX: 0, lastY: 0, lastT: 0 };
@@ -755,15 +972,13 @@ function programParams(phase) {
     return t * t * (3 - 2 * t);
   };
   if (prog === 1) {
-    p.flowMode = 1; // radial out drives the sweep's smears
-  } else if (prog === 2) {
     // empty -> patchy crystallize out of smear -> clean -> patchy melt -> empty
     // (the appear is the exact mirror of the melt: crisp stays on and the
     // noise dissolve ramps, so letters emerge piece by piece from the smear)
     p.inject = ss(0.04, 0.12, phase) - ss(0.86, 0.96, phase);
     p.dissolve = 1.6 * (1 - ss(0.14, 0.44, phase) + ss(0.58, 0.80, phase));
     p.crisp = ss(0.06, 0.12, phase) - ss(0.80, 0.90, phase);
-  } else if (prog === 3) {
+  } else if (prog === 2) {
     const a = 2 * Math.PI * phase;
     p.lightPos = [0.5 + 0.26 * Math.cos(a) / (W / H), 0.5 + 0.26 * Math.sin(a)];
     p.lightAmt = 1;
@@ -822,6 +1037,21 @@ function renderFrame(dt) {
   gl.uniform1f(fu.uMouseAmt, mouseAmt);
   gl.uniform1i(fu.uProg, pp.prog);
   gl.uniform1f(fu.uPhase, phase);
+  gl.uniform1f(fu.uSweep, ui('sweepChk').checked ? 1 : 0);
+  gl.uniform1i(fu.uSweepMode, +ui('sweepMode').value);
+  const sw = sweepPhaseBounds(period);
+  gl.uniform1f(fu.uSweepMeltEnd, sw.meltEnd);
+  gl.uniform1f(fu.uSweepHoldEnd, sw.holdEnd);
+  gl.uniform1f(fu.uSweepHealEnd, sw.healEnd);
+  const roll = rollingPhaseBounds(period);
+  gl.uniform1f(fu.uSweepRollHealStart, roll.healStart);
+  gl.uniform1f(fu.uSweepRollHealEnd, roll.healEnd);
+  const cas = cascadePhaseParams(period);
+  gl.uniform1f(fu.uSweepBase, cas.base);
+  gl.uniform1f(fu.uSweepStagger, cas.stagger);
+  gl.uniform1f(fu.uSweepHealDur, cas.healDur);
+  gl.uniform1i(fu.uLetterCount, letterCount);
+  gl.uniform1fv(fu.uLetterStarts, letterStarts);
   gl.uniform1f(fu.uInject, pp.inject);
   gl.uniform1f(fu.uDissolveAmt, pp.dissolve);
   gl.uniform2f(fu.uLightPos, pp.lightPos[0], pp.lightPos[1]);
@@ -876,6 +1106,19 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
+function exportFilename(ext) {
+  const T = +ui('period').value;
+  const slug = s => (s || '').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'none';
+  const text = (ui('textInput').value || 'text').trim()
+    .replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '-').slice(0, 48);
+  const flow = slug(ui('flowMode').selectedOptions[0].textContent);
+  const sweep = ui('sweepChk').checked
+    ? slug(ui('sweepMode').selectedOptions[0].textContent)
+    : 'no-sweep';
+  return `cosmos-smear-${text}-${sweep}-${flow}-${T}s-loop.${ext}`;
+}
+
 async function exportVideo() {
   if (state.exporting) return;
   const btn = ui('exportBtn');
@@ -921,7 +1164,7 @@ async function exportVideo() {
       btn.textContent = 'Finalizing\u2026';
       await encoder.flush();
       muxer.finalize();
-      download(new Blob([muxer.target.buffer], { type: 'video/mp4' }), `cosmos-smear-${T}s-loop.mp4`);
+      download(new Blob([muxer.target.buffer], { type: 'video/mp4' }), exportFilename('mp4'));
     } else {
       // realtime WebM fallback: wait one period to settle, then record one
       btn.textContent = 'Warming up\u2026';
@@ -937,7 +1180,7 @@ async function exportVideo() {
       await new Promise(r => setTimeout(r, T * 1000));
       rec.stop();
       await done;
-      download(new Blob(chunks, { type: 'video/webm' }), `cosmos-smear-${T}s-loop.webm`);
+      download(new Blob(chunks, { type: 'video/webm' }), exportFilename('webm'));
     }
   } catch (e) {
     console.error(e);
