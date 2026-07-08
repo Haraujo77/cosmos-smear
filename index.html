@@ -321,8 +321,11 @@
       <input type="range" id="liqDyeDecay" min="0.9" max="0.999" step="0.001" value="0.993">
       <output id="liqDyeDecayOut">0.99</output></label>
     <label class="row"><span class="lbl">Gloss</span>
-      <input type="range" id="liqGloss" min="0" max="2" step="0.05" value="1.0">
-      <output id="liqGlossOut">1.0</output></label>
+      <input type="range" id="liqGloss" min="0" max="3" step="0.05" value="1.2">
+      <output id="liqGlossOut">1.2</output></label>
+    <label class="row"><span class="lbl">Glimmer</span>
+      <input type="range" id="liqGlimmer" min="0" max="3" step="0.05" value="1.4">
+      <output id="liqGlimmerOut">1.4</output></label>
     <label class="row liqWaterOpt"><span class="lbl">Refraction</span>
       <input type="range" id="liqRefract" min="0" max="2" step="0.05" value="0.6">
       <output id="liqRefractOut">0.6</output></label>
@@ -989,6 +992,7 @@ uniform vec2 uTextBounds;
 uniform float uSeed;
 uniform int uPreset;
 uniform float uGloss;
+uniform float uGlimmer;
 uniform float uRefract;
 uniform float uTension;
 uniform vec3 uColRed;
@@ -999,11 +1003,46 @@ uniform vec3 uColTextB;
 uniform vec3 uColGlow;
 out vec4 outColor;
 ${NOISE}
+vec3 liquidGlimmer(vec3 n, float facing, vec2 dGrad, vec2 vel, vec2 uv, vec2 p,
+                   float blur, float alpha, float glimmer, float gloss) {
+  vec3 nn = normalize(n + vec3(-dGrad.x, -dGrad.y, 0.12) * 0.45);
+  vec3 L1 = normalize(vec3(0.32, 0.58, 1.0));
+  vec3 L2 = normalize(vec3(-0.48, 0.34, 0.88));
+  vec3 L3 = normalize(vec3(sin(uTime * 0.9) * 0.35, 0.72, 0.62));
+
+  float spec1 = pow(max(dot(nn, L1), 0.0), 28.0);
+  float spec2 = pow(max(dot(nn, L2), 0.0), 52.0);
+  float spec3 = pow(max(dot(nn, L3), 0.0), uPreset == 1 ? 110.0 : 64.0);
+
+  float caust = fbm(p * 9.0 + vec2(uTime * 0.75, -uTime * 0.55) + uSeed);
+  float ripple = fbm(p * 16.0 + vel * 3.0 + uTime * 0.4);
+  float shimmer = smoothstep(0.52, 0.92, caust) * smoothstep(0.38, 0.88, ripple);
+
+  float curve = clamp(length(dGrad) * 11.0, 0.0, 1.0);
+  float edgeGlint = pow(curve, 1.6) * sqrt(facing);
+
+  vec2 spCell = floor(uv * uRes / vec2(3.5, 3.5));
+  float sparkle = step(0.988, hash(spCell + floor(uTime * 14.0) + uSeed)) * blur;
+
+  float flowGlint = pow(clamp(length(vel) * 6.0, 0.0, 1.0), 1.8);
+
+  vec3 gleam = uColGlow * (spec1 * 1.5 + spec2 * 0.75 + spec3 * 0.5) * gloss;
+  gleam += mix(uColGlow, vec3(1.0), 0.75) * shimmer * glimmer * 1.1;
+  gleam += mix(uColGlow, vec3(1.0), 0.55) * edgeGlint * glimmer * 0.85;
+  gleam += vec3(1.0) * sparkle * glimmer * 2.8;
+  gleam += mix(uColGlow, vec3(1.0), 0.65) * flowGlint * glimmer * 0.55;
+
+  float fres = pow(1.0 - facing, 2.2);
+  gleam += uColGlow * fres * glimmer * 0.65;
+
+  return gleam * alpha;
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 asp = vec2(uRes.x / uRes.y, 1.0);
   vec2 p = uv * asp + uSeed;
-  vec2 px = 3.0 / uRes;
+  vec2 px = 3.5 / uRes;
+  vec2 pxW = px * 2.2;
 
   vec4 dye = texture(uDye, uv);
   vec2 vel = texture(uVel, uv).xy;
@@ -1013,9 +1052,13 @@ void main() {
   float dR = texture(uDye, uv + vec2( px.x, 0.0)).a;
   float dB = texture(uDye, uv + vec2(0.0, -px.y)).a;
   float dT = texture(uDye, uv + vec2(0.0,  px.y)).a;
-  float blur = (dens + dL + dR + dB + dT) * 0.2;
-  vec2 dGrad = vec2(dR - dL, dT - dB);
-  vec3 n = normalize(vec3(dGrad.x, dGrad.y, 0.14 / asp.x + uTension * 0.04));
+  float dL2 = texture(uDye, uv + vec2(-pxW.x, 0.0)).a;
+  float dR2 = texture(uDye, uv + vec2( pxW.x, 0.0)).a;
+  float dB2 = texture(uDye, uv + vec2(0.0, -pxW.y)).a;
+  float dT2 = texture(uDye, uv + vec2(0.0,  pxW.y)).a;
+  float blur = (dens * 2.0 + dL + dR + dB + dT + dL2 + dR2 + dB2 + dT2) * 0.1;
+  vec2 dGrad = vec2(dR + dR2 - dL - dL2, dT + dT2 - dB - dB2) * 0.5;
+  vec3 n = normalize(vec3(dGrad.x, dGrad.y, 0.16 / asp.x + uTension * 0.05));
   float facing = clamp(n.z, 0.0, 1.0);
 
   float g1 = fbm(p * 1.15 + uBgOff + 3.1);
@@ -1028,35 +1071,29 @@ void main() {
     smoothstep(0.55, 1.0, gy));
 
   vec3 liqCol = (dens > 0.01) ? dye.rgb / dens : textCol;
-  float alpha = smoothstep(0.03, 0.42, blur);
+  liqCol = mix(liqCol * 0.72, liqCol * 1.12, facing);
+  float alpha = smoothstep(0.025, 0.38, blur);
   vec3 col = bg;
 
   if (uPreset == 1) {
-    // Mercury — metallic blobs, dark meniscus edges
-    vec3 refl = mix(uColGlow * 0.25 + liqCol * 0.35, liqCol, facing);
-    col = mix(col, mix(liqCol, refl, 0.72), alpha);
-    float spec = pow(max(dot(n, normalize(vec3(-0.35, 0.65, 0.95))), 0.0), 55.0);
-    col += vec3(1.0) * spec * uGloss * 1.6 * alpha;
-    col *= 1.0 - (1.0 - facing) * 0.4 * alpha;
+    vec3 refl = mix(uColGlow * 0.3 + liqCol * 0.4, liqCol, facing);
+    col = mix(col, mix(liqCol, refl, 0.78), alpha);
+    col *= 1.0 - (1.0 - facing) * 0.38 * alpha;
   } else if (uPreset == 0) {
-    // Water — translucent body, fresnel rim, ripple highlights
-    vec2 refr = dGrad * uRefract * 0.05;
+    vec2 refr = dGrad * uRefract * 0.06;
     vec3 rbg = mix(bg, textCol, 0.08);
-    col = mix(rbg, liqCol, alpha * 0.82);
-    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, alpha * 0.25);
-    float fres = pow(1.0 - facing, 2.5);
-    col = mix(col, uColGlow, fres * uGloss * 0.45 * alpha);
-    float spec = pow(max(dot(n, normalize(vec3(0.25, 0.55, 1.0))), 0.0), 36.0);
-    col += uColGlow * spec * uGloss * 0.7 * alpha;
+    col = mix(rbg, liqCol, alpha * 0.78);
+    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, alpha * 0.3);
+    float fres = pow(1.0 - facing, 2.8);
+    col = mix(col, uColGlow, fres * uGloss * 0.55 * alpha);
   } else {
-    // Full sim — richer meniscus + motion specular
     col = mix(col, liqCol, alpha);
     float edge = clamp(length(dGrad) * 7.0, 0.0, 1.0) * alpha;
-    col *= 1.0 - edge * 0.3;
-    float spec = pow(clamp(length(vel) * 4.0, 0.0, 1.0), 2.5) * uGloss;
-    col = mix(col, uColGlow, spec * alpha);
-    col = mix(col, uColGlow, pow(1.0 - facing, 3.0) * 0.25 * alpha);
+    col *= 1.0 - edge * 0.28;
+    col = mix(col, uColGlow, pow(1.0 - facing, 3.0) * 0.3 * alpha);
   }
+
+  col += liquidGlimmer(n, facing, dGrad, vel, uv, p, blur, alpha, uGlimmer, uGloss);
 
   col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.012;
   outColor = vec4(col, 1.0);
@@ -1291,7 +1328,7 @@ function hexToRgb(hex) {
 
 const engineSettings = { smear: {}, liquid: {} };
 const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
-const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqRefract', 'liqPressure', 'liqVort'];
+const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqGlimmer', 'liqRefract', 'liqPressure', 'liqVort'];
 
 function saveEngineSettings(engine) {
   const store = engineSettings[engine];
@@ -1362,6 +1399,7 @@ const sliders = [
   ['liqFill', v => v.toFixed(2)],
   ['liqDyeDecay', v => v.toFixed(2)],
   ['liqGloss', v => v.toFixed(2)],
+  ['liqGlimmer', v => v.toFixed(2)],
   ['liqRefract', v => v.toFixed(2)],
   ['liqPressure', v => v.toFixed(0)],
   ['liqVort', v => v.toFixed(2)],
@@ -1837,6 +1875,7 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(lc.uSeed, state.seed);
   gl.uniform1i(lc.uPreset, +ui('liqPreset').value);
   gl.uniform1f(lc.uGloss, easeVal('lgloss', +ui('liqGloss').value, k));
+  gl.uniform1f(lc.uGlimmer, easeVal('lglim', +ui('liqGlimmer').value, k));
   gl.uniform1f(lc.uRefract, easeVal('lrefr', +ui('liqRefract').value, k));
   gl.uniform1f(lc.uTension, easeVal('ltens', +ui('liqTension').value, k));
   gl.uniform3fv(lc.uColRed, easeColor('red', ui('colRed').value, k));
