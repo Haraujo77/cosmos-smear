@@ -289,14 +289,15 @@
     </div>
 
     <div id="liquidControls" style="display:none">
-    <div class="hint" style="margin:0 0 10px">Letters are liquid — heal coalesces like melt in reverse. Lotus beads without wetting.</div>
+    <div class="hint" style="margin:0 0 10px">Letters are liquid — sweep choreographs them forming and breaking apart.</div>
     <label class="row"><span class="lbl">Material</span>
       <select id="liqPreset">
         <option value="0" selected>Water</option>
         <option value="1">Mercury</option>
         <option value="2">Full sim</option>
-        <option value="3">Lotus (non-wetting)</option>
+        <option value="3">Lotus</option>
       </select></label>
+    <div class="hint liqLotusHint" style="display:none;margin:0 0 10px">Lotus: non-wetting beads — high contact angle, droplets roll and coalesce without soaking.</div>
     <label class="row"><span class="lbl">Cohesion</span>
       <input type="range" id="liqCohesion" min="0" max="4" step="0.05" value="1.8">
       <output id="liqCohesionOut">1.8</output></label>
@@ -732,66 +733,11 @@ float sweepDissolve(vec2 uv, float ph) {
 float liquidForm(vec2 uv, float ph) {
   return clamp(1.0 - sweepDissolve(uv, ph), 0.0, 1.0);
 }
-float sweepMeltBand(vec2 uv, float ph) {
-  if (uSweep < 0.5) return 0.0;
-  float band = 0.0;
-  if (uSweepMode == 2) {
-    float tM = max(uSweepMeltEnd, 0.001);
-    float e_m = ph < tM ? mix(-0.15, 1.15, ph / tM) : 1.15;
-    band = smoothstep(e_m - 0.12, e_m + 0.02, uv.x)
-         * (1.0 - smoothstep(e_m + 0.02, e_m + 0.14, uv.x));
-  } else if (uSweepMode == 0) {
-    float t1 = max(uSweepMeltEnd, 0.001);
-    if (ph < t1) {
-      float e = mix(-0.15, 1.15, ph / t1);
-      band = smoothstep(e - 0.12, e + 0.02, uv.x)
-           * (1.0 - smoothstep(e + 0.02, e + 0.14, uv.x));
-    }
-  } else {
-    int letterIdx = uLetterCount - 1;
-    for (int i = 0; i < 31; i++) {
-      if (i >= uLetterCount - 1) break;
-      if (uv.x < uLetterStarts[i + 1]) { letterIdx = i; break; }
-    }
-    float idxf = float(letterIdx);
-    float meltStart = uSweepBase + idxf * uSweepStagger;
-    float meltEnd = meltStart + uSweepStagger * 0.85;
-    if (ph >= meltStart && ph < meltEnd)
-      band = smoothstep(meltStart, meltEnd, ph);
-  }
-  return band;
-}
-float sweepCoalesceBand(vec2 uv, float ph) {
-  if (uSweep < 0.5) return 0.0;
-  float band = 0.0;
-  if (uSweepMode == 2) {
-    float tHS = uSweepRollHealStart;
-    float tHE = max(uSweepRollHealEnd, tHS + 0.001);
-    float e_h = ph < tHS ? -0.15
-      : (ph < tHE ? mix(-0.15, 1.15, (ph - tHS) / (tHE - tHS)) : 1.15);
-    band = smoothstep(e_h - 0.14, e_h - 0.02, uv.x)
-         * (1.0 - smoothstep(e_h - 0.02, e_h + 0.12, uv.x));
-  } else if (uSweepMode == 0) {
-    float t2 = max(uSweepHoldEnd, uSweepMeltEnd + 0.001);
-    float t3 = max(uSweepHealEnd, t2 + 0.001);
-    if (ph >= t2 && ph < t3) {
-      float e = mix(-0.15, 1.15, (ph - t2) / (t3 - t2));
-      band = smoothstep(e - 0.14, e - 0.02, uv.x)
-           * (1.0 - smoothstep(e - 0.02, e + 0.12, uv.x));
-    }
-  } else {
-    int letterIdx = uLetterCount - 1;
-    for (int i = 0; i < 31; i++) {
-      if (i >= uLetterCount - 1) break;
-      if (uv.x < uLetterStarts[i + 1]) { letterIdx = i; break; }
-    }
-    float idxf = float(letterIdx);
-    float healStart = uSweepBase + (idxf + 1.0) * uSweepStagger;
-    float healEnd = healStart + uSweepHealDur;
-    if (ph >= healStart && ph < healEnd)
-      band = 1.0 - smoothstep(healStart, healEnd, ph);
-  }
-  return band;
+// 1 while the heal/form front is advancing (inverse of melt), 0 while melting
+float liquidForming(vec2 uv, float ph) {
+  float f0 = liquidForm(uv, ph);
+  float f1 = liquidForm(uv, fract(ph + 0.012));
+  return clamp((f1 - f0) * 40.0, 0.0, 1.0);
 }
 vec2 textGrad(sampler2D tex, vec2 uv, vec2 res) {
   vec2 px = 2.5 / res;
@@ -838,8 +784,8 @@ uniform vec2 uFlowOff;
 uniform float uCohesion;
 uniform float uFormStr;
 uniform float uTension;
-uniform int uPreset;
 uniform float uPhase;
+uniform int uPreset;
 uniform float uSweep;
 uniform int uSweepMode;
 uniform float uSweepMeltEnd;
@@ -869,41 +815,30 @@ void main() {
 
   float form = liquidForm(uv, uPhase) * uFormStr;
   float scatter = clamp(1.0 - form, 0.0, 1.0);
-  float meltBand = sweepMeltBand(uv, uPhase);
-  float coalesceBand = sweepCoalesceBand(uv, uPhase);
-  float lotus = float(uPreset == 3);
+  float forming = liquidForming(uv, uPhase);
   float txt = texture(uText, uv).a;
   float dens = texture(uDye, uv).a;
   vec2 tg = textGrad(uText, uv, uRes);
   float tgL = length(tg);
+  float lotus = uPreset == 3 ? 1.0 : 0.0;
 
   vel.y -= uGravity * uDt * (1.0 - form * txt * 0.9);
 
-  // lotus: non-wetting — repel from glyph faces, bead at edges
-  if (lotus > 0.5) {
-    float edgeBead = smoothstep(0.02, 0.12, tgL) * (1.0 - txt * 0.85);
-    vel += tg / max(tgL, 1e-4) * edgeBead * uCohesion * uDt * 22.0;
-    vel -= tg / max(tgL, 1e-4) * txt * uCohesion * uDt * 18.0;
-  } else if (tgL > 1e-4) {
+  // pull loose fluid toward glyph strokes so letters coalesce
+  if (tgL > 1e-4) {
     vec2 dir = tg / tgL;
-    vel += dir * uCohesion * form * (0.5 + 0.5 * (1.0 - txt)) * uDt * 18.0;
-    vel += tg * uCohesion * form * txt * uDt * 28.0;
+    // heal: strong inward rush (mirror of melt's outward push)
+    float healPull = form * (0.55 + forming * 1.8);
+    vel += dir * uCohesion * healPull * (0.55 + 0.7 * (1.0 - txt)) * uDt * 22.0;
+    vel += tg * uCohesion * healPull * txt * uDt * 32.0;
+    // during forming, suck nearby exterior fluid into the stroke
+    if (forming > 0.05 && txt < 0.35)
+      vel += dir * uCohesion * forming * uDt * 38.0;
   }
 
-  // melt front: break apart like the sweep wave
-  vel -= tg / max(tgL, 1e-4) * (scatter * 0.55 + meltBand * 0.85) * uCohesion * uDt * 14.0;
-  vel += curl(p * 2.1 + uFlowOff) * (uSwirl * (scatter + meltBand * 0.7) + uSwirl * 0.12) * uDt;
-
-  // heal front: coalesce wave — pull liquid inward along the sweep
-  if (coalesceBand > 0.01) {
-    vel.x -= coalesceBand * uDt * 14.0;
-    if (tgL > 1e-4) {
-      vec2 dir = tg / tgL;
-      vel += dir * coalesceBand * uCohesion * uDt * 42.0;
-      vel += tg * coalesceBand * txt * uDt * 55.0;
-    }
-    vel.y -= coalesceBand * uGravity * uDt * 0.35;
-  }
+  // break apart / slosh when melting
+  vel -= tg * scatter * uCohesion * uDt * 10.0;
+  vel += curl(p * 2.1 + uFlowOff) * (uSwirl * scatter + uSwirl * 0.15) * uDt;
 
   // surface tension from density laplacian
   vec2 dpx = 2.0 / uRes;
@@ -912,7 +847,18 @@ void main() {
   float dB = texture(uDye, uv + vec2(0.0, -dpx.y)).a;
   float dT = texture(uDye, uv + vec2(0.0,  dpx.y)).a;
   float lap = (dL + dR + dB + dT) - 4.0 * dens;
-  vel -= vec2(dR - dL, dT - dB) * lap * uTension * uDt * 22.0;
+  float tens = uTension * (1.0 + lotus * 1.6);
+  vel -= vec2(dR - dL, dT - dB) * lap * tens * uDt * 22.0;
+
+  // Lotus non-wetting: bead up — push fluid off flat glyph interiors toward edges/droplets
+  if (lotus > 0.5) {
+    float film = txt * dens * (1.0 - clamp(tgL * 8.0, 0.0, 1.0));
+    if (tgL > 1e-4)
+      vel += (tg / tgL) * film * uDt * 26.0; // flee wet film toward rim
+    // extra beading: contract toward local density peaks
+    vec2 densGrad = vec2(dR - dL, dT - dB);
+    vel += densGrad * dens * uDt * 14.0;
+  }
 
   if (uProg == 2) {
     vec2 ld = (uv - uLightPos) * asp;
@@ -1006,9 +952,9 @@ uniform float uDecay;
 uniform float uSeed;
 uniform float uFill;
 uniform float uFormStr;
-uniform int uPreset;
 uniform float uPhase;
 uniform float uBootstrap;
+uniform int uPreset;
 uniform float uSweep;
 uniform int uSweepMode;
 uniform float uSweepMeltEnd;
@@ -1037,10 +983,11 @@ void main() {
 
   float form = liquidForm(uv, uPhase) * uFormStr;
   float scatter = clamp(1.0 - form, 0.0, 1.0);
-  float meltBand = sweepMeltBand(uv, uPhase);
-  float coalesceBand = sweepCoalesceBand(uv, uPhase);
-  float lotus = float(uPreset == 3);
+  float forming = liquidForming(uv, uPhase);
   float txt = texture(uText, uv).a;
+  float lotus = uPreset == 3 ? 1.0 : 0.0;
+  vec2 tg = textGrad(uText, uv, uRes);
+  float tgL = length(tg);
 
   float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
   vec3 textCol = mix(
@@ -1048,47 +995,45 @@ void main() {
     uColTextA,
     smoothstep(0.55, 1.0, gy));
 
-  vec2 tg = textGrad(uText, uv, uRes);
-  float tgL = length(tg);
-  float edgeBead = smoothstep(0.02, 0.14, tgL) * (1.0 - txt * 0.88);
+  // heal: spawn / grow liquid as a moving front (not a global fade)
+  // — exterior droplets near the stroke get pulled in; stroke fills from edges
+  float edgeMask = clamp(tgL * 10.0, 0.0, 1.0);
+  float healFront = forming * (0.35 + 0.65 * edgeMask);
+  float fillAmt = form * uFill * (0.25 + healFront * 1.4 + (1.0 - forming) * 0.55);
+  float target = txt * fillAmt;
+  // during forming, also seed beads just outside the glyph so they can rush in
+  if (forming > 0.08 && txt < 0.2 && tgL > 0.01) {
+    float near = smoothstep(0.0, 0.08, tgL) * (1.0 - smoothstep(0.08, 0.22, tgL));
+    target = max(target, near * forming * uFill * 0.55);
+  }
+  float deficit = max(target - dye.a, 0.0);
+  if (deficit > 0.001) {
+    float add = deficit * (2.2 + forming * 5.5);
+    dye.rgb += textCol * add;
+    dye.a = min(dye.a + add, 1.0);
+  }
 
-  // heal wave: pull dye from ahead of the front and deposit into letters
-  if (coalesceBand > 0.005) {
-    vec2 ahead = clamp(uv + vec2(0.018, 0.0), 0.001, 0.999);
-    float upstream = texture(uDye, ahead).a;
-    float transfer = upstream * coalesceBand * 0.55 * uDt * 60.0;
-    dye.rgb += textCol * transfer;
-    dye.a = min(dye.a + transfer, 1.0);
-    if (txt > 0.04) {
-      float snap = coalesceBand * txt * uFill * 7.0 * uDt * 60.0;
-      dye.rgb += textCol * snap;
-      dye.a = min(dye.a + snap, 1.0);
+  // Lotus: break thin films into beads (non-wetting)
+  if (lotus > 0.5 && dye.a > 0.02) {
+    float film = txt * (1.0 - clamp(tgL * 9.0, 0.0, 1.0));
+    // thin interior film evaporates / beads away
+    dye.a *= 1.0 - film * 0.08 * uDt * 60.0;
+    // concentrate remaining mass into edge beads
+    if (tgL > 0.02 && dye.a > 0.05) {
+      float bead = smoothstep(0.02, 0.12, tgL) * form * 0.35;
+      dye.a = min(dye.a + bead * uDt * 40.0, 1.0);
+      dye.rgb = mix(dye.rgb, textCol * dye.a, bead * 0.4);
     }
   }
 
-  // lotus: beads on stroke edges only — no interior wetting
-  float wetTarget = lotus > 0.5
-    ? edgeBead * form * uFill * 0.85 + txt * form * uFill * 0.08
-    : txt * form * uFill;
-  if (form > 0.82 && coalesceBand < 0.05) {
-    float deficit = max(wetTarget - dye.a, 0.0);
-    if (deficit > 0.001) {
-      float add = deficit * 2.5;
-      dye.rgb += textCol * add;
-      dye.a = min(dye.a + add, 1.0);
-    }
-  }
-
-  // when fully formed, snap gradient
-  if (form > 0.55 && txt > 0.05 && dye.a > 0.02) {
+  // when formed, snap color to the vertical gradient so letters stay clean
+  if (form > 0.35 && txt > 0.05 && dye.a > 0.02) {
     vec3 gradPM = textCol * dye.a;
-    dye.rgb = mix(dye.rgb, gradPM, form * txt * 0.9);
+    dye.rgb = mix(dye.rgb, gradPM, form * txt * 0.85);
   }
 
-  // melt wave: erode at front (mirror of coalesce)
-  float erode = (scatter * 0.10 + meltBand * 0.35) * txt * uDt * 60.0;
-  if (lotus > 0.5) erode += meltBand * edgeBead * 0.25 * uDt * 60.0;
-  dye.a *= 1.0 - erode;
+  // erode letter liquid when breaking apart (melt motion)
+  dye.a *= 1.0 - scatter * txt * 0.12 * uDt * 60.0;
 
   // seed scattered droplets so animation can coalesce into letters
   if (uBootstrap > 0.01) {
@@ -1097,7 +1042,7 @@ void main() {
     if (h > 0.93) {
       float blob = smoothstep(0.93, 0.99, h) * uBootstrap;
       dye.a = max(dye.a, blob * 0.55);
-      dye.rgb = mix(dye.rgb, textCol, blob * 0.7);
+      dye.rgb = mix(dye.rgb, textCol * dye.a, blob * 0.7);
     }
   }
 
@@ -1213,17 +1158,17 @@ void main() {
     col += mix(uColGlow, bodyCol, 0.4) * rim * 0.65;
     col += bodyCol * caust * 0.18;
   } else if (uPreset == 3) {
-    // Lotus — non-wetting beads, micro-texture shimmer, high contact angle
-    float micro = fbm(p * 28.0 + uTime * 0.35) * 0.5 + 0.5;
-    float bead = smoothstep(0.08, 0.42, blur) * (1.0 - smoothstep(0.55, 0.85, blur));
-    float dew = pow(max(dot(n, L2), 0.0), 48.0) * (0.6 + micro * 0.4);
-    col = mix(col, bodyCol, alpha * 0.88);
-    col += uColGlow * dew * uGloss * 1.4 * bead;
-    col += uColGlow * sparkle * bead;
-    col += mix(uColGlow, bodyCol, 0.5) * rim * 1.2 * bead;
-    col += bodyCol * caust * 0.2 * bead;
-    // non-wetting dark gap at stroke boundary
-    col = mix(col, bg, edge * (1.0 - interior) * 0.35 * alpha);
+    // Lotus — non-wetting beads: round droplets, bright contact-angle rim, dry gaps
+    float bead = smoothstep(0.18, 0.55, blur);
+    float contact = pow(1.0 - facing, 1.6) * edge;
+    vec3 beadCol = mix(bodyCol * 0.75, bodyCol, facing);
+    col = mix(col, beadCol, bead * alpha);
+    // strong specular on bead crowns
+    col += uColGlow * (specT * 1.4 + specS * 2.0) * uGloss * bead;
+    // bright contact-angle ring (lotus leaf look)
+    col += mix(uColGlow, bodyCol, 0.25) * contact * (0.9 + uRim) * bead;
+    col += uColGlow * sparkle * 1.2;
+    col += mix(uColGlow, bodyCol, 0.4) * caust * 0.2 * bead;
   } else if (uPreset == 0) {
     vec3 deep = mix(bodyCol * 0.82, bodyCol, facing);
     col = mix(col, deep, alpha);
@@ -1585,6 +1530,20 @@ function updateLiqOpts() {
   document.querySelectorAll('.liqWaterOpt').forEach(el => {
     el.style.display = preset === '0' ? '' : 'none';
   });
+  document.querySelectorAll('.liqLotusHint').forEach(el => {
+    el.style.display = preset === '3' ? '' : 'none';
+  });
+  // Lotus defaults: high tension / cohesion for beading
+  if (preset === '3') {
+    if (+ui('liqTension').value < 1.5) {
+      ui('liqTension').value = '2.2';
+      ui('liqTensionOut').textContent = '2.20';
+    }
+    if (+ui('liqCohesion').value < 1.5) {
+      ui('liqCohesion').value = '2.4';
+      ui('liqCohesionOut').textContent = '2.40';
+    }
+  }
 }
 updateLiqOpts();
 
@@ -1773,7 +1732,7 @@ function bindSweepUniforms(u, period) {
 function liqPressureIters() {
   const preset = +ui('liqPreset').value;
   if (preset === 2) return +ui('liqPressure').value;
-  if (preset === 3) return 10;
+  if (preset === 3) return 12; // Lotus needs a bit more incompressibility for beads
   return preset === 1 ? 6 : 8;
 }
 
@@ -1901,8 +1860,8 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ff.uCohesion, easeVal('lcoh', +ui('liqCohesion').value, k));
   gl.uniform1f(ff.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
   gl.uniform1f(ff.uTension, easeVal('ltens', +ui('liqTension').value, k));
-  gl.uniform1i(ff.uPreset, +ui('liqPreset').value);
   gl.uniform1f(ff.uPhase, phase);
+  gl.uniform1i(ff.uPreset, +ui('liqPreset').value);
   bindSweepUniforms(ff, period);
   gl.uniform1i(ff.uProg, pp.prog);
   gl.uniform2f(ff.uLightPos, pp.lightPos[0], pp.lightPos[1]);
@@ -1998,9 +1957,9 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ldy.uSeed, state.seed);
   gl.uniform1f(ldy.uFill, easeVal('lfill', +ui('liqFill').value, k));
   gl.uniform1f(ldy.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
-  gl.uniform1i(ldy.uPreset, +ui('liqPreset').value);
   gl.uniform1f(ldy.uPhase, phase);
   gl.uniform1f(ldy.uBootstrap, liqBootstrap);
+  gl.uniform1i(ldy.uPreset, +ui('liqPreset').value);
   bindSweepUniforms(ldy, period);
   gl.uniform3fv(ldy.uColTextA, easeColor('txa', ui('colTextA').value, k));
   gl.uniform3fv(ldy.uColTextM, easeColor('txm', ui('colTextM').value, k));
