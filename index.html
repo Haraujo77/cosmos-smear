@@ -321,11 +321,20 @@
       <input type="range" id="liqDyeDecay" min="0.9" max="0.999" step="0.001" value="0.993">
       <output id="liqDyeDecayOut">0.99</output></label>
     <label class="row"><span class="lbl">Gloss</span>
-      <input type="range" id="liqGloss" min="0" max="3" step="0.05" value="1.2">
-      <output id="liqGlossOut">1.2</output></label>
+      <input type="range" id="liqGloss" min="0" max="3" step="0.05" value="1.4">
+      <output id="liqGlossOut">1.4</output></label>
     <label class="row"><span class="lbl">Glimmer</span>
-      <input type="range" id="liqGlimmer" min="0" max="3" step="0.05" value="1.4">
-      <output id="liqGlimmerOut">1.4</output></label>
+      <input type="range" id="liqGlimmer" min="0" max="3" step="0.05" value="1.6">
+      <output id="liqGlimmerOut">1.6</output></label>
+    <label class="row"><span class="lbl">Sparkle</span>
+      <input type="range" id="liqSparkle" min="0" max="3" step="0.05" value="1.2">
+      <output id="liqSparkleOut">1.2</output></label>
+    <label class="row"><span class="lbl">Caustics</span>
+      <input type="range" id="liqCaustics" min="0" max="2" step="0.05" value="0.9">
+      <output id="liqCausticsOut">0.9</output></label>
+    <label class="row"><span class="lbl">Rim light</span>
+      <input type="range" id="liqRim" min="0" max="2" step="0.05" value="1.0">
+      <output id="liqRimOut">1.0</output></label>
     <label class="row liqWaterOpt"><span class="lbl">Refraction</span>
       <input type="range" id="liqRefract" min="0" max="2" step="0.05" value="0.6">
       <output id="liqRefractOut">0.6</output></label>
@@ -954,13 +963,19 @@ void main() {
     uColTextA,
     smoothstep(0.55, 1.0, gy));
 
-  // fill letter volume with liquid when forming
+  // fill letter volume — store premultiplied gradient color
   float target = txt * form * uFill;
   float deficit = max(target - dye.a, 0.0);
   if (deficit > 0.001) {
     float add = deficit * 5.5;
-    dye.rgb = mix(dye.rgb, textCol, add / max(dye.a + add, 1e-3));
+    dye.rgb += textCol * add;
     dye.a = min(dye.a + add, 1.0);
+  }
+
+  // when formed, snap color to the vertical gradient so letters stay clean
+  if (form > 0.35 && txt > 0.05 && dye.a > 0.02) {
+    vec3 gradPM = textCol * dye.a;
+    dye.rgb = mix(dye.rgb, gradPM, form * txt * 0.85);
   }
 
   // erode letter liquid when breaking apart
@@ -993,6 +1008,9 @@ uniform float uSeed;
 uniform int uPreset;
 uniform float uGloss;
 uniform float uGlimmer;
+uniform float uSparkle;
+uniform float uCaustics;
+uniform float uRim;
 uniform float uRefract;
 uniform float uTension;
 uniform vec3 uColRed;
@@ -1003,46 +1021,30 @@ uniform vec3 uColTextB;
 uniform vec3 uColGlow;
 out vec4 outColor;
 ${NOISE}
-vec3 liquidGlimmer(vec3 n, float facing, vec2 dGrad, vec2 vel, vec2 uv, vec2 p,
-                   float blur, float alpha, float glimmer, float gloss) {
-  vec3 nn = normalize(n + vec3(-dGrad.x, -dGrad.y, 0.12) * 0.45);
-  vec3 L1 = normalize(vec3(0.32, 0.58, 1.0));
-  vec3 L2 = normalize(vec3(-0.48, 0.34, 0.88));
-  vec3 L3 = normalize(vec3(sin(uTime * 0.9) * 0.35, 0.72, 0.62));
 
-  float spec1 = pow(max(dot(nn, L1), 0.0), 28.0);
-  float spec2 = pow(max(dot(nn, L2), 0.0), 52.0);
-  float spec3 = pow(max(dot(nn, L3), 0.0), uPreset == 1 ? 110.0 : 64.0);
-
-  float caust = fbm(p * 9.0 + vec2(uTime * 0.75, -uTime * 0.55) + uSeed);
-  float ripple = fbm(p * 16.0 + vel * 3.0 + uTime * 0.4);
-  float shimmer = smoothstep(0.52, 0.92, caust) * smoothstep(0.38, 0.88, ripple);
-
-  float curve = clamp(length(dGrad) * 11.0, 0.0, 1.0);
-  float edgeGlint = pow(curve, 1.6) * sqrt(facing);
-
-  vec2 spCell = floor(uv * uRes / vec2(3.5, 3.5));
-  float sparkle = step(0.988, hash(spCell + floor(uTime * 14.0) + uSeed)) * blur;
-
-  float flowGlint = pow(clamp(length(vel) * 6.0, 0.0, 1.0), 1.8);
-
-  vec3 gleam = uColGlow * (spec1 * 1.5 + spec2 * 0.75 + spec3 * 0.5) * gloss;
-  gleam += mix(uColGlow, vec3(1.0), 0.75) * shimmer * glimmer * 1.1;
-  gleam += mix(uColGlow, vec3(1.0), 0.55) * edgeGlint * glimmer * 0.85;
-  gleam += vec3(1.0) * sparkle * glimmer * 2.8;
-  gleam += mix(uColGlow, vec3(1.0), 0.65) * flowGlint * glimmer * 0.55;
-
-  float fres = pow(1.0 - facing, 2.2);
-  gleam += uColGlow * fres * glimmer * 0.65;
-
-  return gleam * alpha;
+float liqSparkle(vec2 uv, vec2 grad, float t, float scale, float seed) {
+  vec2 sp = uv * scale + grad * 6.0;
+  vec2 cell = floor(sp);
+  float h1 = hash(cell + seed);
+  float h2 = hash(cell * 1.37 + vec2(13.0, 7.0) + seed);
+  float tw = sin(t * (5.0 + h1 * 9.0) + h2 * 40.0) * 0.5 + 0.5;
+  float glint = smoothstep(0.93, 0.995, h1) * smoothstep(0.86, 0.94, h2) * tw;
+  return glint * smoothstep(0.04, 0.22, length(grad)) * (1.0 - smoothstep(0.35, 0.75, length(grad)));
 }
+
+float liqCaustics(vec2 uv, vec2 vel, float t) {
+  vec2 flow = vel * 3.0 + vec2(sin(t * 0.7), cos(t * 0.55)) * 0.08;
+  vec2 p = uv * 9.0 + flow;
+  float c1 = fbm(p + vec2(t * 0.22, -t * 0.17));
+  float c2 = fbm(p * 1.9 + vec2(-t * 0.14, t * 0.2) + 4.7);
+  return pow(clamp(c1 * c2 * 1.35, 0.0, 1.0), 1.4);
+}
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 asp = vec2(uRes.x / uRes.y, 1.0);
   vec2 p = uv * asp + uSeed;
-  vec2 px = 3.5 / uRes;
-  vec2 pxW = px * 2.2;
+  vec2 px = 2.0 / uRes;
 
   vec4 dye = texture(uDye, uv);
   vec2 vel = texture(uVel, uv).xy;
@@ -1052,14 +1054,12 @@ void main() {
   float dR = texture(uDye, uv + vec2( px.x, 0.0)).a;
   float dB = texture(uDye, uv + vec2(0.0, -px.y)).a;
   float dT = texture(uDye, uv + vec2(0.0,  px.y)).a;
-  float dL2 = texture(uDye, uv + vec2(-pxW.x, 0.0)).a;
-  float dR2 = texture(uDye, uv + vec2( pxW.x, 0.0)).a;
-  float dB2 = texture(uDye, uv + vec2(0.0, -pxW.y)).a;
-  float dT2 = texture(uDye, uv + vec2(0.0,  pxW.y)).a;
-  float blur = (dens * 2.0 + dL + dR + dB + dT + dL2 + dR2 + dB2 + dT2) * 0.1;
-  vec2 dGrad = vec2(dR + dR2 - dL - dL2, dT + dT2 - dB - dB2) * 0.5;
-  vec3 n = normalize(vec3(dGrad.x, dGrad.y, 0.16 / asp.x + uTension * 0.05));
+  float blur = (dens + dL + dR + dB + dT) * 0.2;
+  vec2 dGrad = vec2(dR - dL, dT - dB);
+  float curv = (dL + dR + dB + dT - 4.0 * dens);
+  vec3 n = normalize(vec3(dGrad.x, dGrad.y, 0.16 / asp.x + uTension * 0.04 - curv * 1.2));
   float facing = clamp(n.z, 0.0, 1.0);
+  float edge = clamp(length(dGrad) * 4.5, 0.0, 1.0);
 
   float g1 = fbm(p * 1.15 + uBgOff + 3.1);
   vec3 bg = mix(uColRed, uColPinkBg, smoothstep(0.42, 0.88, g1));
@@ -1070,32 +1070,58 @@ void main() {
     uColTextA,
     smoothstep(0.55, 1.0, gy));
 
-  vec3 liqCol = (dens > 0.01) ? dye.rgb / dens : textCol;
-  liqCol = mix(liqCol * 0.72, liqCol * 1.12, facing);
-  float alpha = smoothstep(0.025, 0.38, blur);
+  // position gradient is the true letter color; advected rgb only tints during scatter
+  float solid = smoothstep(0.28, 0.62, blur);
+  vec3 advectCol = (dens > 0.01) ? dye.rgb / dens : textCol;
+  vec3 bodyCol = mix(advectCol, textCol, solid);
+  float alpha = smoothstep(0.10, 0.50, blur);
   vec3 col = bg;
 
+  vec3 L1 = normalize(vec3(0.28, 0.62, 0.95));
+  vec3 L2 = normalize(vec3(-0.42, 0.38, 0.88));
+  vec3 L3 = normalize(vec3(0.12, -0.25, 0.96));
+  float specB = pow(max(dot(n, L1), 0.0), 22.0);
+  float specT = pow(max(dot(n, L2), 0.0), 72.0);
+  float specS = pow(max(dot(n, L3), 0.0), 120.0);
+  float motionSpec = pow(clamp(length(vel) * 5.5, 0.0, 1.0), 2.2);
+
+  float interior = smoothstep(0.22, 0.58, blur) * (1.0 - edge * 0.92);
+  float sp1 = liqSparkle(uv + uSeed, dGrad, uTime, 95.0 * uSparkle, uSeed);
+  float sp2 = liqSparkle(uv * 1.4 + 5.2, dGrad, uTime * 1.35, 140.0 * uSparkle, uSeed + 2.7);
+  float sp3 = liqSparkle(uv * 0.8 - 3.1, dGrad, uTime * 0.85, 60.0 * uSparkle, uSeed + 9.1);
+  float sparkle = (sp1 + sp2 * 0.75 + sp3 * 0.5) * uGlimmer * interior;
+
+  float caust = liqCaustics(uv, vel, uTime) * uCaustics * interior;
+  float fres = pow(1.0 - facing, 2.4);
+  float outerRim = smoothstep(0.12, 0.38, blur) * (1.0 - smoothstep(0.42, 0.72, blur));
+  float rim = fres * outerRim * uRim;
+
   if (uPreset == 1) {
-    vec3 refl = mix(uColGlow * 0.3 + liqCol * 0.4, liqCol, facing);
-    col = mix(col, mix(liqCol, refl, 0.78), alpha);
-    col *= 1.0 - (1.0 - facing) * 0.38 * alpha;
+    vec3 chrome = mix(bodyCol, uColGlow, specT * 0.35);
+    col = mix(col, chrome, alpha);
+    col += vec3(1.0) * (specT * 1.2 + specS * 1.6) * uGloss * interior;
+    col += uColGlow * sparkle;
+    col += mix(uColGlow, bodyCol, 0.4) * rim * 0.65;
+    col += bodyCol * caust * 0.18;
   } else if (uPreset == 0) {
-    vec2 refr = dGrad * uRefract * 0.06;
-    vec3 rbg = mix(bg, textCol, 0.08);
-    col = mix(rbg, liqCol, alpha * 0.78);
-    col = mix(col, texture(uDye, clamp(uv + refr, 0.001, 0.999)).rgb, alpha * 0.3);
-    float fres = pow(1.0 - facing, 2.8);
-    col = mix(col, uColGlow, fres * uGloss * 0.55 * alpha);
+    vec3 deep = mix(bodyCol * 0.82, bodyCol, facing);
+    col = mix(col, deep, alpha);
+    col += bodyCol * (1.0 - facing) * 0.12 * interior;
+    col += uColGlow * fres * uGloss * 0.35 * interior;
+    col += uColGlow * (specB * 0.4 + specT * 0.85 + specS * 0.5) * uGloss * interior;
+    col += uColGlow * sparkle;
+    col += mix(uColGlow, bodyCol, 0.45) * caust * 0.35;
+    col += mix(uColGlow, bodyCol, 0.35) * rim * 0.5;
   } else {
-    col = mix(col, liqCol, alpha);
-    float edge = clamp(length(dGrad) * 7.0, 0.0, 1.0) * alpha;
-    col *= 1.0 - edge * 0.28;
-    col = mix(col, uColGlow, pow(1.0 - facing, 3.0) * 0.3 * alpha);
+    col = mix(col, bodyCol, alpha);
+    col += uColGlow * (specB + specT * 1.1 + motionSpec * 0.6) * uGloss * interior;
+    col += uColGlow * sparkle;
+    col += uColGlow * caust * 0.25;
+    col += uColGlow * rim * 0.45;
   }
 
-  col += liquidGlimmer(n, facing, dGrad, vel, uv, p, blur, alpha, uGlimmer, uGloss);
-
-  col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.012;
+  col += uColGlow * motionSpec * uGlimmer * 0.22 * interior;
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.008;
   outColor = vec4(col, 1.0);
 }`;
 
@@ -1328,7 +1354,7 @@ function hexToRgb(hex) {
 
 const engineSettings = { smear: {}, liquid: {} };
 const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
-const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqGlimmer', 'liqRefract', 'liqPressure', 'liqVort'];
+const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqGlimmer', 'liqSparkle', 'liqCaustics', 'liqRim', 'liqRefract', 'liqPressure', 'liqVort'];
 
 function saveEngineSettings(engine) {
   const store = engineSettings[engine];
@@ -1400,6 +1426,9 @@ const sliders = [
   ['liqDyeDecay', v => v.toFixed(2)],
   ['liqGloss', v => v.toFixed(2)],
   ['liqGlimmer', v => v.toFixed(2)],
+  ['liqSparkle', v => v.toFixed(2)],
+  ['liqCaustics', v => v.toFixed(2)],
+  ['liqRim', v => v.toFixed(2)],
   ['liqRefract', v => v.toFixed(2)],
   ['liqPressure', v => v.toFixed(0)],
   ['liqVort', v => v.toFixed(2)],
@@ -1876,6 +1905,9 @@ function renderLiquidFrame(dt) {
   gl.uniform1i(lc.uPreset, +ui('liqPreset').value);
   gl.uniform1f(lc.uGloss, easeVal('lgloss', +ui('liqGloss').value, k));
   gl.uniform1f(lc.uGlimmer, easeVal('lglim', +ui('liqGlimmer').value, k));
+  gl.uniform1f(lc.uSparkle, easeVal('lspk', +ui('liqSparkle').value, k));
+  gl.uniform1f(lc.uCaustics, easeVal('lcaus', +ui('liqCaustics').value, k));
+  gl.uniform1f(lc.uRim, easeVal('lrim', +ui('liqRim').value, k));
   gl.uniform1f(lc.uRefract, easeVal('lrefr', +ui('liqRefract').value, k));
   gl.uniform1f(lc.uTension, easeVal('ltens', +ui('liqTension').value, k));
   gl.uniform3fv(lc.uColRed, easeColor('red', ui('colRed').value, k));
