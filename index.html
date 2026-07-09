@@ -113,7 +113,6 @@
   button.primary { background: #ff2d55; border-color: #ff2d55; color: #fff; }
   button.primary:hover { background: #ff4468; }
   #fallbackNote { color:#ff8; font-size:11px; display:none; margin-top:8px; }
-  /* Liquid tab UI styles (disabled)
   .tabs {
     display: flex;
     gap: 6px;
@@ -137,7 +136,6 @@
     border-color: #ff4fa3;
     color: #ffb8d8;
   }
-  */
 </style>
 </head>
 <body>
@@ -145,7 +143,7 @@
 
 <aside id="panel">
   <h1>Cosmos Smear</h1>
-  <!-- Liquid tab switcher (disabled)
+  <!-- LIQUID TAB (disabled)
   <div class="tabs">
     <button type="button" class="tab active" data-engine="smear">Smear</button>
     <button type="button" class="tab" data-engine="liquid">Liquid</button>
@@ -292,7 +290,7 @@
       <output id="softnessOut">1.2</output></label>
     </div>
 
-    <!-- Liquid controls (disabled)
+    <!-- LIQUID CONTROLS (disabled)
     <div id="liquidControls" style="display:none">
     <div class="hint" style="margin:0 0 10px">Letters are liquid — sweep choreographs them forming and breaking apart.</div>
     <label class="row"><span class="lbl">Material</span>
@@ -349,8 +347,8 @@
     <label class="row liqFullOpt" style="display:none"><span class="lbl">Vorticity</span>
       <input type="range" id="liqVort" min="0" max="1" step="0.05" value="0.3">
       <output id="liqVortOut">0.30</output></label>
-    -->
     </div>
+    -->
 
     <div class="btns" style="margin-top:12px">
       <button id="playBtn">Pause</button>
@@ -385,7 +383,7 @@ const hasLinearFloat = !!gl.getExtension('OES_texture_float_linear');
 
 const W = canvas.width, H = canvas.height;
 
-const state = { playing: true, seed: Math.random() * 100, engine: 'smear', exporting: false };
+const state = { playing: true, seed: Math.random() * 100, exporting: false };
 
 const VERT = `#version 300 es
 void main() {
@@ -690,7 +688,7 @@ void main() {
   outColor = vec4(col, 1.0);
 }`;
 
-/* Liquid engine shaders (disabled)
+/* LIQUID ENGINE SHADERS (disabled)
 // Shared sweep dissolve GLSL (used by liquid engine)
 const SWEEP_GLSL = `
 float sweepDissolve(vec2 uv, float ph) {
@@ -1160,7 +1158,7 @@ function program(fragSrc) {
 
 const feedbackProg = program(FEEDBACK);
 const compositeProg = program(COMPOSITE);
-/* Liquid programs (disabled)
+/* LIQUID PROGRAMS (disabled)
 const liqAdvectProg = program(LIQ_ADVECT);
 const liqForcesProg = program(LIQ_FORCES);
 const liqDivProg = program(LIQ_DIVERGENCE);
@@ -1192,7 +1190,7 @@ function makeTarget() {
 let targets = [makeTarget(), makeTarget()];
 let cur = 0;
 
-/* Liquid FBOs (disabled)
+/* LIQUID FBOs (disabled)
 let velTargets = [makeTarget(), makeTarget()];
 let dyeTargets = [makeTarget(), makeTarget()];
 let pressTargets = [makeTarget(), makeTarget()];
@@ -1210,7 +1208,7 @@ function clearSmearTargets() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
-/* Liquid clear (disabled)
+/* LIQUID TARGET CLEAR (disabled)
 function clearLiquidTargets() {
   for (const arr of [velTargets, dyeTargets, pressTargets]) {
     for (const t of arr) {
@@ -1231,11 +1229,7 @@ function clearTargets() {
   clearSmearTargets();
 }
 
-function clearAllTargets() {
-  clearSmearTargets();
-}
-
-clearAllTargets();
+clearTargets();
 
 // ---------------------------------------------------------------- text texture
 const textCanvas = document.createElement('canvas');
@@ -1365,14 +1359,15 @@ function hexToRgb(hex) {
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 }
 
-/* Liquid tab engine switcher (disabled)
-const engineSettings = { smear: {}, liquid: {} };
+const engineSettings = { smear: {} };
 const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
+/* LIQUID ENGINE SETTINGS (disabled)
 const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqGlimmer', 'liqSparkle', 'liqCaustics', 'liqRim', 'liqRefract', 'liqPressure', 'liqVort'];
+*/
 
 function saveEngineSettings(engine) {
   const store = engineSettings[engine];
-  const ids = engine === 'smear' ? smearControlIds : liquidControlIds;
+  const ids = smearControlIds;
   for (const id of ids) {
     const el = ui(id);
     if (!el) continue;
@@ -1382,7 +1377,7 @@ function saveEngineSettings(engine) {
 
 function loadEngineSettings(engine) {
   const store = engineSettings[engine];
-  const ids = engine === 'smear' ? smearControlIds : liquidControlIds;
+  const ids = smearControlIds;
   for (const id of ids) {
     const el = ui(id);
     if (!el || !(id in store)) continue;
@@ -1393,6 +1388,7 @@ function loadEngineSettings(engine) {
   }
 }
 
+/* LIQUID TAB SWITCHING (disabled)
 function switchEngine(engine) {
   if (state.engine === engine) return;
   saveEngineSettings(state.engine);
@@ -1431,7 +1427,7 @@ const sliders = [
   ['sweepHold', v => v.toFixed(1) + 's'],
   ['sweepOut', v => v.toFixed(1) + 's'],
   ['sweepLead', v => v.toFixed(1) + 's'],
-  /* Liquid sliders (disabled)
+  /* LIQUID SLIDERS (disabled)
   ['liqVisc', v => v.toFixed(2)],
   ['liqGravity', v => v.toFixed(1)],
   ['liqSwirl', v => v.toFixed(2)],
@@ -1452,6 +1448,7 @@ const sliders = [
 ];
 for (const [id, fmt] of sliders) {
   const el = ui(id), out = ui(id + 'Out');
+  if (!el || !out) continue;
   const update = () => { out.textContent = fmt(+el.value); };
   el.addEventListener('input', update);
   update();
@@ -1469,10 +1466,10 @@ ui('playBtn').addEventListener('click', () => {
   state.playing = !state.playing;
   ui('playBtn').textContent = state.playing ? 'Pause' : 'Play';
 });
-ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearAllTargets(); });
+ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearTargets(); });
 ui('clearBtn').addEventListener('click', clearTargets);
 
-/* Liquid opts (disabled)
+/* LIQUID PRESET UI (disabled)
 ui('liqPreset').addEventListener('change', updateLiqOpts);
 function updateLiqOpts() {
   const preset = ui('liqPreset').value;
@@ -1668,12 +1665,13 @@ function bindSweepUniforms(u, period) {
   gl.uniform1fv(u.uLetterStarts, letterStarts);
 }
 
-/* Liquid render path (disabled)
+/* LIQUID PRESSURE (disabled)
 function liqPressureIters() {
   const preset = +ui('liqPreset').value;
   if (preset === 2) return +ui('liqPressure').value;
   return preset === 1 ? 6 : 8;
 }
+*/
 
 // ---------------------------------------------------------------- render loop
 let time = 0;
@@ -1757,6 +1755,7 @@ function renderSmearFrame(dt) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
+/* LIQUID RENDER (disabled)
 function renderLiquidFrame(dt) {
   const k = Math.min(1, dt * 2.2);
   const off = driftOffsets(time);
@@ -1938,7 +1937,6 @@ function renderLiquidFrame(dt) {
   gl.uniform3fv(lc.uColGlow, easeColor('glow', ui('colGlow').value, k));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
-
 */
 
 function renderFrame(dt) {
@@ -1972,12 +1970,6 @@ function exportFilename(ext) {
   const sweep = ui('sweepChk').checked
     ? slug(ui('sweepMode').selectedOptions[0].textContent)
     : 'no-sweep';
-  /* Liquid export naming (disabled)
-  if (state.engine === 'liquid') {
-    const style = slug(ui('liqPreset').selectedOptions[0].textContent);
-    return `cosmos-liquid-${text}-${sweep}-${style}-${T}s-loop.${ext}`;
-  }
-  */
   const flow = slug(ui('flowMode').selectedOptions[0].textContent);
   return `cosmos-smear-${text}-${sweep}-${flow}-${T}s-loop.${ext}`;
 }
@@ -2058,10 +2050,7 @@ ui('exportBtn').addEventListener('click', exportVideo);
 
 redrawText();
 document.fonts.ready.then(redrawText);
-/* Liquid settings init (disabled)
 saveEngineSettings('smear');
-saveEngineSettings('liquid');
-*/
 requestAnimationFrame(frame);
 </script>
 </body>
