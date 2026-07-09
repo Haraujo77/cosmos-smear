@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cosmos Type FX — smear &amp; liquid</title>
+<title>Cosmos Smear — dissolving type</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400..800&family=Fredoka:wght@300..700&family=Nunito:wght@200..1000&family=Quicksand:wght@300..700&family=Varela+Round&family=Inter:wght@100..900&display=swap" rel="stylesheet">
@@ -113,6 +113,7 @@
   button.primary { background: #ff2d55; border-color: #ff2d55; color: #fff; }
   button.primary:hover { background: #ff4468; }
   #fallbackNote { color:#ff8; font-size:11px; display:none; margin-top:8px; }
+  /* Liquid tab UI styles (disabled)
   .tabs {
     display: flex;
     gap: 6px;
@@ -136,17 +137,20 @@
     border-color: #ff4fa3;
     color: #ffb8d8;
   }
+  */
 </style>
 </head>
 <body>
 <div id="stage"><canvas id="gl" width="896" height="1120"></canvas></div>
 
 <aside id="panel">
-  <h1>Cosmos Type FX</h1>
+  <h1>Cosmos Smear</h1>
+  <!-- Liquid tab switcher (disabled)
   <div class="tabs">
     <button type="button" class="tab active" data-engine="smear">Smear</button>
     <button type="button" class="tab" data-engine="liquid">Liquid</button>
   </div>
+  -->
 
   <div class="group">
     <div class="gtitle">Type</div>
@@ -288,6 +292,7 @@
       <output id="softnessOut">1.2</output></label>
     </div>
 
+    <!-- Liquid controls (disabled)
     <div id="liquidControls" style="display:none">
     <div class="hint" style="margin:0 0 10px">Letters are liquid — sweep choreographs them forming and breaking apart.</div>
     <label class="row"><span class="lbl">Material</span>
@@ -295,9 +300,7 @@
         <option value="0" selected>Water</option>
         <option value="1">Mercury</option>
         <option value="2">Full sim</option>
-        <option value="3">Lotus</option>
       </select></label>
-    <div class="hint liqLotusHint" style="display:none;margin:0 0 10px">Lotus: non-wetting beads — high contact angle, droplets roll and coalesce without soaking.</div>
     <label class="row"><span class="lbl">Cohesion</span>
       <input type="range" id="liqCohesion" min="0" max="4" step="0.05" value="1.8">
       <output id="liqCohesionOut">1.8</output></label>
@@ -346,6 +349,7 @@
     <label class="row liqFullOpt" style="display:none"><span class="lbl">Vorticity</span>
       <input type="range" id="liqVort" min="0" max="1" step="0.05" value="0.3">
       <output id="liqVortOut">0.30</output></label>
+    -->
     </div>
 
     <div class="btns" style="margin-top:12px">
@@ -686,6 +690,7 @@ void main() {
   outColor = vec4(col, 1.0);
 }`;
 
+/* Liquid engine shaders (disabled)
 // Shared sweep dissolve GLSL (used by liquid engine)
 const SWEEP_GLSL = `
 float sweepDissolve(vec2 uv, float ph) {
@@ -733,12 +738,6 @@ float sweepDissolve(vec2 uv, float ph) {
 float liquidForm(vec2 uv, float ph) {
   return clamp(1.0 - sweepDissolve(uv, ph), 0.0, 1.0);
 }
-// 1 while the heal/form front is advancing (inverse of melt), 0 while melting
-float liquidForming(vec2 uv, float ph) {
-  float f0 = liquidForm(uv, ph);
-  float f1 = liquidForm(uv, fract(ph + 0.012));
-  return clamp((f1 - f0) * 40.0, 0.0, 1.0);
-}
 vec2 textGrad(sampler2D tex, vec2 uv, vec2 res) {
   vec2 px = 2.5 / res;
   float l = texture(tex, uv + vec2(-px.x, 0.0)).a;
@@ -785,7 +784,6 @@ uniform float uCohesion;
 uniform float uFormStr;
 uniform float uTension;
 uniform float uPhase;
-uniform int uPreset;
 uniform float uSweep;
 uniform int uSweepMode;
 uniform float uSweepMeltEnd;
@@ -815,25 +813,18 @@ void main() {
 
   float form = liquidForm(uv, uPhase) * uFormStr;
   float scatter = clamp(1.0 - form, 0.0, 1.0);
-  float forming = liquidForming(uv, uPhase);
   float txt = texture(uText, uv).a;
   float dens = texture(uDye, uv).a;
   vec2 tg = textGrad(uText, uv, uRes);
   float tgL = length(tg);
-  float lotus = uPreset == 3 ? 1.0 : 0.0;
 
   vel.y -= uGravity * uDt * (1.0 - form * txt * 0.9);
 
   // pull loose fluid toward glyph strokes so letters coalesce
   if (tgL > 1e-4) {
     vec2 dir = tg / tgL;
-    // heal: strong inward rush (mirror of melt's outward push)
-    float healPull = form * (0.55 + forming * 1.8);
-    vel += dir * uCohesion * healPull * (0.55 + 0.7 * (1.0 - txt)) * uDt * 22.0;
-    vel += tg * uCohesion * healPull * txt * uDt * 32.0;
-    // during forming, suck nearby exterior fluid into the stroke
-    if (forming > 0.05 && txt < 0.35)
-      vel += dir * uCohesion * forming * uDt * 38.0;
+    vel += dir * uCohesion * form * (0.5 + 0.5 * (1.0 - txt)) * uDt * 18.0;
+    vel += tg * uCohesion * form * txt * uDt * 28.0;
   }
 
   // break apart / slosh when melting
@@ -847,18 +838,7 @@ void main() {
   float dB = texture(uDye, uv + vec2(0.0, -dpx.y)).a;
   float dT = texture(uDye, uv + vec2(0.0,  dpx.y)).a;
   float lap = (dL + dR + dB + dT) - 4.0 * dens;
-  float tens = uTension * (1.0 + lotus * 1.6);
-  vel -= vec2(dR - dL, dT - dB) * lap * tens * uDt * 22.0;
-
-  // Lotus non-wetting: bead up — push fluid off flat glyph interiors toward edges/droplets
-  if (lotus > 0.5) {
-    float film = txt * dens * (1.0 - clamp(tgL * 8.0, 0.0, 1.0));
-    if (tgL > 1e-4)
-      vel += (tg / tgL) * film * uDt * 26.0; // flee wet film toward rim
-    // extra beading: contract toward local density peaks
-    vec2 densGrad = vec2(dR - dL, dT - dB);
-    vel += densGrad * dens * uDt * 14.0;
-  }
+  vel -= vec2(dR - dL, dT - dB) * lap * uTension * uDt * 22.0;
 
   if (uProg == 2) {
     vec2 ld = (uv - uLightPos) * asp;
@@ -954,7 +934,6 @@ uniform float uFill;
 uniform float uFormStr;
 uniform float uPhase;
 uniform float uBootstrap;
-uniform int uPreset;
 uniform float uSweep;
 uniform int uSweepMode;
 uniform float uSweepMeltEnd;
@@ -983,11 +962,7 @@ void main() {
 
   float form = liquidForm(uv, uPhase) * uFormStr;
   float scatter = clamp(1.0 - form, 0.0, 1.0);
-  float forming = liquidForming(uv, uPhase);
   float txt = texture(uText, uv).a;
-  float lotus = uPreset == 3 ? 1.0 : 0.0;
-  vec2 tg = textGrad(uText, uv, uRes);
-  float tgL = length(tg);
 
   float gy = clamp((uv.y - uTextBounds.x) / max(uTextBounds.y - uTextBounds.x, 1e-4), 0.0, 1.0);
   vec3 textCol = mix(
@@ -995,35 +970,13 @@ void main() {
     uColTextA,
     smoothstep(0.55, 1.0, gy));
 
-  // heal: spawn / grow liquid as a moving front (not a global fade)
-  // — exterior droplets near the stroke get pulled in; stroke fills from edges
-  float edgeMask = clamp(tgL * 10.0, 0.0, 1.0);
-  float healFront = forming * (0.35 + 0.65 * edgeMask);
-  float fillAmt = form * uFill * (0.25 + healFront * 1.4 + (1.0 - forming) * 0.55);
-  float target = txt * fillAmt;
-  // during forming, also seed beads just outside the glyph so they can rush in
-  if (forming > 0.08 && txt < 0.2 && tgL > 0.01) {
-    float near = smoothstep(0.0, 0.08, tgL) * (1.0 - smoothstep(0.08, 0.22, tgL));
-    target = max(target, near * forming * uFill * 0.55);
-  }
+  // fill letter volume — store premultiplied gradient color
+  float target = txt * form * uFill;
   float deficit = max(target - dye.a, 0.0);
   if (deficit > 0.001) {
-    float add = deficit * (2.2 + forming * 5.5);
+    float add = deficit * 5.5;
     dye.rgb += textCol * add;
     dye.a = min(dye.a + add, 1.0);
-  }
-
-  // Lotus: break thin films into beads (non-wetting)
-  if (lotus > 0.5 && dye.a > 0.02) {
-    float film = txt * (1.0 - clamp(tgL * 9.0, 0.0, 1.0));
-    // thin interior film evaporates / beads away
-    dye.a *= 1.0 - film * 0.08 * uDt * 60.0;
-    // concentrate remaining mass into edge beads
-    if (tgL > 0.02 && dye.a > 0.05) {
-      float bead = smoothstep(0.02, 0.12, tgL) * form * 0.35;
-      dye.a = min(dye.a + bead * uDt * 40.0, 1.0);
-      dye.rgb = mix(dye.rgb, textCol * dye.a, bead * 0.4);
-    }
   }
 
   // when formed, snap color to the vertical gradient so letters stay clean
@@ -1032,7 +985,7 @@ void main() {
     dye.rgb = mix(dye.rgb, gradPM, form * txt * 0.85);
   }
 
-  // erode letter liquid when breaking apart (melt motion)
+  // erode letter liquid when breaking apart
   dye.a *= 1.0 - scatter * txt * 0.12 * uDt * 60.0;
 
   // seed scattered droplets so animation can coalesce into letters
@@ -1042,7 +995,7 @@ void main() {
     if (h > 0.93) {
       float blob = smoothstep(0.93, 0.99, h) * uBootstrap;
       dye.a = max(dye.a, blob * 0.55);
-      dye.rgb = mix(dye.rgb, textCol * dye.a, blob * 0.7);
+      dye.rgb = mix(dye.rgb, textCol, blob * 0.7);
     }
   }
 
@@ -1157,18 +1110,6 @@ void main() {
     col += uColGlow * sparkle;
     col += mix(uColGlow, bodyCol, 0.4) * rim * 0.65;
     col += bodyCol * caust * 0.18;
-  } else if (uPreset == 3) {
-    // Lotus — non-wetting beads: round droplets, bright contact-angle rim, dry gaps
-    float bead = smoothstep(0.18, 0.55, blur);
-    float contact = pow(1.0 - facing, 1.6) * edge;
-    vec3 beadCol = mix(bodyCol * 0.75, bodyCol, facing);
-    col = mix(col, beadCol, bead * alpha);
-    // strong specular on bead crowns
-    col += uColGlow * (specT * 1.4 + specS * 2.0) * uGloss * bead;
-    // bright contact-angle ring (lotus leaf look)
-    col += mix(uColGlow, bodyCol, 0.25) * contact * (0.9 + uRim) * bead;
-    col += uColGlow * sparkle * 1.2;
-    col += mix(uColGlow, bodyCol, 0.4) * caust * 0.2 * bead;
   } else if (uPreset == 0) {
     vec3 deep = mix(bodyCol * 0.82, bodyCol, facing);
     col = mix(col, deep, alpha);
@@ -1190,6 +1131,8 @@ void main() {
   col += (hash(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.008;
   outColor = vec4(col, 1.0);
 }`;
+
+*/
 
 function compile(type, src) {
   const sh = gl.createShader(type);
@@ -1217,6 +1160,7 @@ function program(fragSrc) {
 
 const feedbackProg = program(FEEDBACK);
 const compositeProg = program(COMPOSITE);
+/* Liquid programs (disabled)
 const liqAdvectProg = program(LIQ_ADVECT);
 const liqForcesProg = program(LIQ_FORCES);
 const liqDivProg = program(LIQ_DIVERGENCE);
@@ -1224,6 +1168,7 @@ const liqPressProg = program(LIQ_PRESSURE);
 const liqGradProg = program(LIQ_GRADIENT);
 const liqDyeProg = program(LIQ_DYE);
 const liqCompositeProg = program(LIQ_COMPOSITE);
+*/
 
 // ping-pong render targets
 function makeTarget() {
@@ -1247,12 +1192,14 @@ function makeTarget() {
 let targets = [makeTarget(), makeTarget()];
 let cur = 0;
 
+/* Liquid FBOs (disabled)
 let velTargets = [makeTarget(), makeTarget()];
 let dyeTargets = [makeTarget(), makeTarget()];
 let pressTargets = [makeTarget(), makeTarget()];
 let divTarget = makeTarget();
 let velCur = 0, dyeCur = 0, pressCur = 0;
 let liqBootstrap = 0;
+*/
 
 function clearSmearTargets() {
   for (const t of targets) {
@@ -1263,6 +1210,7 @@ function clearSmearTargets() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
+/* Liquid clear (disabled)
 function clearLiquidTargets() {
   for (const arr of [velTargets, dyeTargets, pressTargets]) {
     for (const t of arr) {
@@ -1277,15 +1225,14 @@ function clearLiquidTargets() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   liqBootstrap = 1.0;
 }
+*/
 
 function clearTargets() {
-  if (state.engine === 'smear') clearSmearTargets();
-  else clearLiquidTargets();
+  clearSmearTargets();
 }
 
 function clearAllTargets() {
   clearSmearTargets();
-  clearLiquidTargets();
 }
 
 clearAllTargets();
@@ -1418,6 +1365,7 @@ function hexToRgb(hex) {
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 }
 
+/* Liquid tab engine switcher (disabled)
 const engineSettings = { smear: {}, liquid: {} };
 const smearControlIds = ['slideChk', 'maskSpeed', 'maskScale', 'flowMode', 'flowAngle', 'turb', 'flowSpeed', 'smear', 'softness'];
 const liquidControlIds = ['liqPreset', 'liqCohesion', 'liqForm', 'liqTension', 'liqVisc', 'liqGravity', 'liqSwirl', 'liqFill', 'liqDyeDecay', 'liqGloss', 'liqGlimmer', 'liqSparkle', 'liqCaustics', 'liqRim', 'liqRefract', 'liqPressure', 'liqVort'];
@@ -1463,6 +1411,7 @@ function switchEngine(engine) {
 document.querySelectorAll('.tabs .tab').forEach(btn => {
   btn.addEventListener('click', () => switchEngine(btn.dataset.engine));
 });
+*/
 
 const sliders = [
   ['maskSpeed', v => v.toFixed(1)],
@@ -1482,6 +1431,7 @@ const sliders = [
   ['sweepHold', v => v.toFixed(1) + 's'],
   ['sweepOut', v => v.toFixed(1) + 's'],
   ['sweepLead', v => v.toFixed(1) + 's'],
+  /* Liquid sliders (disabled)
   ['liqVisc', v => v.toFixed(2)],
   ['liqGravity', v => v.toFixed(1)],
   ['liqSwirl', v => v.toFixed(2)],
@@ -1498,6 +1448,7 @@ const sliders = [
   ['liqRefract', v => v.toFixed(2)],
   ['liqPressure', v => v.toFixed(0)],
   ['liqVort', v => v.toFixed(2)],
+  */
 ];
 for (const [id, fmt] of sliders) {
   const el = ui(id), out = ui(id + 'Out');
@@ -1521,6 +1472,7 @@ ui('playBtn').addEventListener('click', () => {
 ui('seedBtn').addEventListener('click', () => { state.seed = Math.random() * 100; clearAllTargets(); });
 ui('clearBtn').addEventListener('click', clearTargets);
 
+/* Liquid opts (disabled)
 ui('liqPreset').addEventListener('change', updateLiqOpts);
 function updateLiqOpts() {
   const preset = ui('liqPreset').value;
@@ -1530,22 +1482,9 @@ function updateLiqOpts() {
   document.querySelectorAll('.liqWaterOpt').forEach(el => {
     el.style.display = preset === '0' ? '' : 'none';
   });
-  document.querySelectorAll('.liqLotusHint').forEach(el => {
-    el.style.display = preset === '3' ? '' : 'none';
-  });
-  // Lotus defaults: high tension / cohesion for beading
-  if (preset === '3') {
-    if (+ui('liqTension').value < 1.5) {
-      ui('liqTension').value = '2.2';
-      ui('liqTensionOut').textContent = '2.20';
-    }
-    if (+ui('liqCohesion').value < 1.5) {
-      ui('liqCohesion').value = '2.4';
-      ui('liqCohesionOut').textContent = '2.40';
-    }
-  }
 }
 updateLiqOpts();
+*/
 
 ui('slideChk').addEventListener('change', () => {
   const on = ui('slideChk').checked;
@@ -1729,10 +1668,10 @@ function bindSweepUniforms(u, period) {
   gl.uniform1fv(u.uLetterStarts, letterStarts);
 }
 
+/* Liquid render path (disabled)
 function liqPressureIters() {
   const preset = +ui('liqPreset').value;
   if (preset === 2) return +ui('liqPressure').value;
-  if (preset === 3) return 12; // Lotus needs a bit more incompressibility for beads
   return preset === 1 ? 6 : 8;
 }
 
@@ -1861,7 +1800,6 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ff.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
   gl.uniform1f(ff.uTension, easeVal('ltens', +ui('liqTension').value, k));
   gl.uniform1f(ff.uPhase, phase);
-  gl.uniform1i(ff.uPreset, +ui('liqPreset').value);
   bindSweepUniforms(ff, period);
   gl.uniform1i(ff.uProg, pp.prog);
   gl.uniform2f(ff.uLightPos, pp.lightPos[0], pp.lightPos[1]);
@@ -1959,7 +1897,6 @@ function renderLiquidFrame(dt) {
   gl.uniform1f(ldy.uFormStr, easeVal('lform', +ui('liqForm').value, k) * pp.inject);
   gl.uniform1f(ldy.uPhase, phase);
   gl.uniform1f(ldy.uBootstrap, liqBootstrap);
-  gl.uniform1i(ldy.uPreset, +ui('liqPreset').value);
   bindSweepUniforms(ldy, period);
   gl.uniform3fv(ldy.uColTextA, easeColor('txa', ui('colTextA').value, k));
   gl.uniform3fv(ldy.uColTextM, easeColor('txm', ui('colTextM').value, k));
@@ -2002,10 +1939,11 @@ function renderLiquidFrame(dt) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
+*/
+
 function renderFrame(dt) {
   time += dt;
-  if (state.engine === 'liquid') renderLiquidFrame(dt);
-  else renderSmearFrame(dt);
+  renderSmearFrame(dt);
 }
 
 function frame(now) {
@@ -2034,10 +1972,12 @@ function exportFilename(ext) {
   const sweep = ui('sweepChk').checked
     ? slug(ui('sweepMode').selectedOptions[0].textContent)
     : 'no-sweep';
+  /* Liquid export naming (disabled)
   if (state.engine === 'liquid') {
     const style = slug(ui('liqPreset').selectedOptions[0].textContent);
     return `cosmos-liquid-${text}-${sweep}-${style}-${T}s-loop.${ext}`;
   }
+  */
   const flow = slug(ui('flowMode').selectedOptions[0].textContent);
   return `cosmos-smear-${text}-${sweep}-${flow}-${T}s-loop.${ext}`;
 }
@@ -2118,8 +2058,10 @@ ui('exportBtn').addEventListener('click', exportVideo);
 
 redrawText();
 document.fonts.ready.then(redrawText);
+/* Liquid settings init (disabled)
 saveEngineSettings('smear');
 saveEngineSettings('liquid');
+*/
 requestAnimationFrame(frame);
 </script>
 </body>
